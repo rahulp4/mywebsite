@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Groundwork — technology, explained from the ground up</title>
+<meta name="description" content="Interactive, from-first-principles explainers on how technology actually works.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F3F6F4; --ink:#16262C; --ink-soft:#41565E; --card:#FFFFFF;
+  --hair:#D9E2DC; --hair-2:#E7EEE9; --brand:#2D5E8B; --brand-soft:#E1EBF4;
+  --r:14px; --shadow:0 1px 2px rgba(22,38,44,.05), 0 8px 24px rgba(22,38,44,.06);
+  --disp:"Bricolage Grotesque", system-ui, sans-serif;
+  --body:"Instrument Sans", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, monospace;
+}
+*{box-sizing:border-box}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--body); font-size:17px; line-height:1.6; -webkit-font-smoothing:antialiased}
+.wrap{max-width:1040px; margin:0 auto; padding:0 24px}
+header{padding:28px 0 8px}
+.headrow{display:flex; align-items:center; justify-content:space-between; gap:16px}
+.brand{font-family:var(--disp); font-weight:800; font-size:21px; letter-spacing:-.02em}
+.brand span{color:var(--brand)}
+.headnote{font-family:var(--mono); font-size:12px; color:var(--ink-soft); letter-spacing:.06em; text-transform:uppercase}
+.hero{padding:52px 0 34px; border-bottom:1px dashed var(--hair)}
+.hero svg{display:block; width:100%; height:56px; margin-bottom:18px}
+.hero h1{font-family:var(--disp); font-weight:800; letter-spacing:-.03em; font-size:clamp(32px,5vw,46px); line-height:1.08; margin:0 0 14px; max-width:16ch}
+.hero p{font-size:18px; color:var(--ink-soft); max-width:56ch; margin:0}
+.filters{display:flex; flex-wrap:wrap; gap:8px; padding:26px 0 6px}
+.chip{
+  font-family:var(--mono); font-size:12.5px; letter-spacing:.04em; border:1.5px solid var(--hair); background:var(--card);
+  color:var(--ink-soft); border-radius:999px; padding:7px 15px; cursor:pointer; transition:border-color .15s,color .15s,background .15s;
+}
+.chip:hover{border-color:var(--brand)}
+.chip.on{background:var(--ink); border-color:var(--ink); color:#fff}
+.grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:18px; padding:22px 0 10px}
+.acard{
+  display:flex; flex-direction:column; background:var(--card); border:1px solid var(--hair); border-radius:var(--r);
+  box-shadow:var(--shadow); overflow:hidden; text-decoration:none; color:inherit; transition:transform .15s, box-shadow .15s;
+}
+.acard:hover{transform:translateY(-2px); box-shadow:0 4px 10px rgba(22,38,44,.08), 0 14px 30px rgba(22,38,44,.1)}
+.acard .bar{height:6px}
+.acard .body{padding:20px 20px 18px; display:flex; flex-direction:column; gap:10px; flex:1}
+.acard .cat{font-family:var(--mono); font-size:11px; letter-spacing:.1em; text-transform:uppercase; font-weight:600}
+.acard h3{font-family:var(--disp); font-weight:700; font-size:19px; letter-spacing:-.015em; line-height:1.25; margin:0}
+.acard p{font-size:14.5px; color:var(--ink-soft); margin:0; flex:1}
+.acard .meta{font-family:var(--mono); font-size:12px; color:var(--ink-soft); display:flex; justify-content:space-between; align-items:center; padding-top:4px; border-top:1px solid var(--hair-2)}
+.acard .go{font-weight:600}
+.emptynote{
+  font-size:14.5px; color:var(--ink-soft); border:1px dashed var(--hair); border-radius:var(--r); padding:20px 22px; margin:8px 0 30px;
+}
+footer{border-top:1px dashed var(--hair); padding:40px 0 50px; margin-top:30px}
+.nl{display:flex; flex-wrap:wrap; gap:10px; align-items:center}
+.nl input{
+  flex:1; min-width:220px; font-family:var(--body); font-size:14.5px; padding:11px 14px; border-radius:9px;
+  border:1.5px solid var(--hair); background:#FCFDFC;
+}
+.nl input:focus{outline:none; border-color:var(--brand)}
+.nl button{
+  font-family:var(--body); font-weight:600; font-size:14px; cursor:pointer; background:var(--ink); color:#fff;
+  border:none; border-radius:999px; padding:11px 20px;
+}
+.nl button:hover{background:#0d1a1f}
+.nlnote{font-size:13.5px; color:var(--ink-soft); margin-top:10px}
+.fmeta{font-size:13.5px; color:var(--ink-soft); margin-top:26px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="headrow">
+      <div class="brand">Groundwork<span>.</span></div>
+      <div class="headnote" id="countNote">1 write-up</div>
+    </div>
+  </header>
+
+  <section class="hero">
+    <svg viewBox="0 0 1000 56" preserveAspectRatio="none" aria-hidden="true">
+      <path d="M0,44 C120,10 220,50 340,20 C440,-2 520,46 640,18 C760,-6 860,42 1000,12" fill="none" stroke="#D9E2DC" stroke-width="2"></path>
+    </svg>
+    <h1>Technology, explained from the ground up.</h1>
+    <p>A shelf of interactive, first-principles write-ups — the kind where you drag a slider instead of taking an equation's word for it. Pick a topic below.</p>
+  </section>
+
+  <nav class="filters" id="filters" aria-label="Filter by category"></nav>
+  <div class="grid" id="grid"></div>
+  <div class="emptynote" id="emptyNote" hidden>No write-ups in this category yet.</div>
+
+  <footer>
+    <div class="brand" style="font-size:16px; margin-bottom:8px">Get notified about new write-ups</div>
+
+    <div class="nl">
+      <input type="email" id="nlEmail" placeholder="you@example.com" aria-label="Email address">
+      <button id="nlBtn" type="button">Notify me</button>
+    </div>
+    <div class="nlnote" id="nlStatus">We'll only email when something new is published — no spam.</div>
+    <p class="fmeta">Groundwork is a personal project. New write-ups are added here as they're finished.</p>
+  </footer>
+</div>
+
+<script>
+(function(){
+'use strict';
+/* =============== SETUP: same Supabase project as your articles =============== *
+ * Paste the same URL + anon key you used in each article's <script> CONFIG so
+ * the newsletter signup here writes to the same "subscribers" table.
+ * ================================================================================ */
+var CONFIG = {
+  SUPABASE_URL: 'YOUR_SUPABASE_URL',
+  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY'
+};
+var CONFIGURED = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY &&
+  CONFIG.SUPABASE_URL.indexOf('supabase.co')!==-1 && CONFIG.SUPABASE_ANON_KEY.indexOf('YOUR_')!==0);
+var sb=null;
+function initClient(){
+  if(!CONFIGURED || !window.supabase || sb) return;
+  sb=window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+}
+window.__sbReady=initClient;
+
+/* =============== the article manifest — add a new write-up here =============== *
+ * accent: any hex color for the card's top bar and category label.
+ * minutes: rough reading/exploring time shown on the card.
+ * ================================================================================ */
+var ARTICLES=[
+  {
+    slug:'ml-fundamentals',
+    title:'Machine Learning from First Principles',
+    tagline:'Watch a straight line teach itself to fit data — loss, gradients, and gradient descent, one interactive demo per idea.',
+    category:'Machine Learning',
+    accent:'#FF6B35',
+    minutes:35,
+    date:'2026-07-03',
+    path:'articles/ml-fundamentals.html'
+  },
+    {
+    slug:'ml-fundamentals',
+    title:'Cloud Native - Dapr',
+    tagline:'Cloud Native Application Architecture With Dapr',
+    category:'Cloud',
+    accent:'#FF6B35',
+    minutes:35,
+    date:'2026-07-03',
+    path:'articles/Cloud_Native_to_Dapr.html'
+  }
+];
+
+function el(id){ return document.getElementById(id); }
+function fmtDate(iso){
+  var d=new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('en-US',{month:'short', day:'numeric', year:'numeric'});
+}
+
+var activeCat='All';
+function categories(){
+  var set=['All'], i;
+  for(i=0;i<ARTICLES.length;i++){ if(set.indexOf(ARTICLES[i].category)===-1) set.push(ARTICLES[i].category); }
+  return set;
+}
+function renderFilters(){
+  var wrap=el('filters'); wrap.innerHTML='';
+  var cats=categories();
+  cats.forEach(function(c){
+    var b=document.createElement('button');
+    b.type='button'; b.className='chip'+(c===activeCat?' on':''); b.textContent=c;
+    b.addEventListener('click',function(){ activeCat=c; renderFilters(); renderGrid(); });
+    wrap.appendChild(b);
+  });
+}
+function renderGrid(){
+  var grid=el('grid'); grid.innerHTML='';
+  var shown=ARTICLES.filter(function(a){ return activeCat==='All' || a.category===activeCat; });
+  shown.forEach(function(a){
+    var card=document.createElement('a');
+    card.className='acard'; card.href=a.path;
+    card.innerHTML=
+      '<div class="bar" style="background:'+a.accent+'"></div>'+
+      '<div class="body">'+
+        '<span class="cat" style="color:'+a.accent+'">'+a.category+'</span>'+
+        '<h3>'+a.title+'</h3>'+
+        '<p>'+a.tagline+'</p>'+
+        '<div class="meta"><span>'+fmtDate(a.date)+' · '+a.minutes+' min</span><span class="go">Read →</span></div>'+
+      '</div>';
+    grid.appendChild(card);
+  });
+  el('emptyNote').toggleAttribute('hidden', shown.length>0);
+  el('countNote').textContent = ARTICLES.length+' write-up'+(ARTICLES.length===1?'':'s');
+}
+
+function validEmail(v){ return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v); }
+el('nlBtn').addEventListener('click',function(){
+  var email=el('nlEmail').value.trim();
+  if(!validEmail(email)){ el('nlStatus').textContent='Please enter a valid email address.'; return; }
+  if(CONFIGURED && sb){
+    sb.from('subscribers').insert({email:email, article_id:'site-newsletter'}).then(function(res){
+      if(res && res.error){ el('nlStatus').textContent='Something went wrong — please try again.'; return; }
+      el('nlEmail').value='';
+      el('nlStatus').textContent='You\'re on the list — thanks!';
+    });
+  } else {
+    el('nlEmail').value='';
+    el('nlStatus').textContent='Saved on this screen only — backend not configured yet (see CONFIG at the top of this file).';
+  }
+});
+
+renderFilters();
+renderGrid();
+if(CONFIGURED && window.supabase) initClient();
+})();
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer onload="window.__sbReady && window.__sbReady()"></script>
+</body>
+</html>

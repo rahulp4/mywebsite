@@ -1,0 +1,1361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cloud Native to Dapr — Groundwork</title>
+<meta name="description" content="From containers and Kubernetes to the sidecar runtime that carries the cross-cutting concerns — an interactive, from-first-principles walkthrough.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<style>
+:root{
+  --paper:#F3F6F4; --ink:#16262C; --ink-soft:#41565E; --card:#FFFFFF;
+  --hair:#D9E2DC; --hair-2:#E7EEE9;
+  --r:14px; --shadow:0 1px 2px rgba(22,38,44,.05), 0 8px 24px rgba(22,38,44,.06);
+  --disp:"Bricolage Grotesque", system-ui, sans-serif;
+  --body:"Instrument Sans", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, monospace;
+
+  /* semantic accents for this article */
+  --app:#B8641B;   --app-soft:#F6E3CF;   /* your business logic */
+  --side:#275D9E;  --side-soft:#DCE8F6;  /* the Dapr sidecar / runtime */
+  --infra:#177E63; --infra-soft:#D7EFE7; /* pluggable backends / components */
+  --err:#C0453F;   --err-soft:#F7E1DF;   /* failure / outage / danger */
+  --amber:#B98214;
+
+  /* aliases so shared Groundwork modules (narrator/engagement) restyle automatically */
+  --model:#B8641B; --model-soft:#F6E3CF;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--body); font-size:16.5px; line-height:1.62; -webkit-font-smoothing:antialiased}
+a{color:var(--side)}
+h1,h2,h3{font-family:var(--disp); line-height:1.14; margin:0 0 14px}
+h2{font-size:clamp(26px,3.4vw,34px); font-weight:800; letter-spacing:-.01em}
+h3{font-size:19px; font-weight:700; margin-top:26px}
+p{margin:0 0 16px}
+code{font-family:var(--mono); font-size:.88em; background:var(--hair-2); border-radius:6px; padding:1px 6px}
+pre{font-family:var(--mono); font-size:13px; line-height:1.55; background:#101D23; color:#DCE7E2; border-radius:12px; padding:16px 18px; overflow:auto; margin:0}
+pre .yk{color:#8FBEEF} pre .yv{color:#F2C48D} pre .yc{color:#6E8894}
+.eyebrow{display:inline-block; font-family:var(--mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase; color:var(--side); background:var(--side-soft); border-radius:999px; padding:4px 12px; margin-bottom:14px}
+.note{font-size:13.5px; color:var(--ink-soft)}
+.kw-app{color:var(--app); font-weight:600}
+.kw-side{color:var(--side); font-weight:600}
+.kw-infra{color:var(--infra); font-weight:600}
+.kw-err{color:var(--err); font-weight:600}
+
+/* ---------- top bar: the plumbing meter (signature element) ---------- */
+#topbar{position:fixed; top:0; left:0; right:0; z-index:60; background:rgba(243,246,244,.9); backdrop-filter:blur(8px); border-bottom:1px solid var(--hair)}
+#topbar .inner{max-width:1080px; margin:0 auto; display:flex; align-items:center; gap:16px; padding:9px 20px}
+#topbar .brand{font-family:var(--disp); font-weight:800; font-size:15px; white-space:nowrap}
+#topbar .brand span{color:var(--side)}
+#podmeter{flex:1; display:flex; align-items:center; gap:10px; min-width:0}
+#podmeter .podshell{flex:1; height:16px; border:1.5px solid var(--hair); border-radius:999px; overflow:hidden; display:flex; background:var(--card)}
+#podmeter .appfill{background:var(--app); min-width:26%; flex:1; transition:none}
+#podmeter .sidefill{background:var(--side); width:0%}
+#podmeter .lbl{font-family:var(--mono); font-size:11px; color:var(--ink-soft); white-space:nowrap}
+#podmeter .lbl b{color:var(--side); font-weight:600}
+@media (max-width:640px){ #podmeter .lbl{display:none} }
+
+/* ---------- left rail nav ---------- */
+#rail{position:fixed; left:18px; top:50%; transform:translateY(-50%); z-index:50; display:flex; flex-direction:column; gap:2px}
+#rail a{display:flex; align-items:center; gap:8px; text-decoration:none; color:var(--ink-soft); font-family:var(--mono); font-size:11px; padding:5px 9px; border-radius:8px; max-width:172px}
+#rail a:hover{background:var(--hair-2)}
+#rail a.here{color:var(--ink); background:var(--card); box-shadow:var(--shadow)}
+#rail a .idx{color:var(--side); font-weight:600; width:18px}
+@media (max-width:1240px){ #rail{display:none} }
+
+/* ---------- hero ---------- */
+.hero{max-width:1080px; margin:0 auto; padding:120px 20px 60px; display:grid; grid-template-columns:1.15fr .85fr; gap:44px; align-items:center}
+@media (max-width:880px){ .hero{grid-template-columns:1fr; padding-top:96px} }
+.hero h1{font-size:clamp(38px,6vw,62px); font-weight:800; letter-spacing:-.02em; margin:14px 0 18px}
+.hero h1 em{font-style:normal; color:var(--side)}
+.hero .lede{font-size:19px; color:var(--ink-soft); max-width:34em}
+.cta{display:inline-block; margin-top:20px; background:var(--ink); color:#fff; text-decoration:none; font-family:var(--disp); font-weight:700; font-size:15.5px; padding:12px 24px; border-radius:999px; box-shadow:var(--shadow)}
+.cta:hover{background:#0d1a1f}
+/* hero pod diagram */
+.heropod{background:var(--card); border:1px solid var(--hair); border-radius:var(--r); box-shadow:var(--shadow); padding:22px}
+.heropod .podlabel{font-family:var(--mono); font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:12px}
+.heropod .row{display:flex; align-items:stretch; gap:12px}
+.hp-box{flex:1; border-radius:12px; padding:14px 12px; text-align:center}
+.hp-box .t{font-family:var(--disp); font-weight:700; font-size:15px}
+.hp-box .s{font-family:var(--mono); font-size:10.5px; margin-top:3px; opacity:.85}
+.hp-app{background:var(--app-soft); color:var(--app); border:1.5px solid var(--app)}
+.hp-side{background:var(--side-soft); color:var(--side); border:1.5px solid var(--side)}
+.hp-link{display:flex; flex-direction:column; justify-content:center; align-items:center; gap:2px; font-family:var(--mono); font-size:10px; color:var(--ink-soft)}
+.hp-link .wire{width:38px; height:2px; background:var(--ink-soft); position:relative; overflow:visible}
+.hp-link .wire::after{content:""; position:absolute; top:-3px; left:0; width:8px; height:8px; border-radius:50%; background:var(--side); animation:packet 2.2s linear infinite}
+@keyframes packet{0%{left:0; background:var(--app)} 49%{left:30px; background:var(--app)} 50%{left:30px; background:var(--side)} 100%{left:0; background:var(--side)}}
+@media (prefers-reduced-motion:reduce){ .hp-link .wire::after{animation:none} }
+.heropod .under{margin-top:12px; border-top:1px dashed var(--hair); padding-top:10px; font-size:12.5px; color:var(--ink-soft)}
+
+/* ---------- chapters ---------- */
+section.chapter{max-width:840px; margin:0 auto; padding:64px 20px 26px}
+.chapnum{font-family:var(--mono); font-size:12px; color:var(--ink-soft); letter-spacing:.14em}
+.panel{background:var(--card); border:1px solid var(--hair); border-radius:var(--r); box-shadow:var(--shadow); padding:22px 24px; margin:22px 0}
+.panel .tag{display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:.13em; text-transform:uppercase; border-radius:6px; padding:3px 9px; margin-bottom:12px}
+.panel.analogy{border-left:4px solid var(--amber)}
+.panel.analogy .tag{background:#F6ECD6; color:var(--amber)}
+.panel.mathp{border-left:4px solid var(--side)}
+.panel.mathp .tag{background:var(--side-soft); color:var(--side)}
+.panel.demo{border-left:4px solid var(--app)}
+.panel.demo .tag{background:var(--app-soft); color:var(--app)}
+.eq{font-size:19px; text-align:center; padding:10px 6px; overflow-x:auto}
+.eq-inline{white-space:nowrap}
+.glossary{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+.chip{font-size:12.5px; background:var(--hair-2); border:1px solid var(--hair); border-radius:999px; padding:4px 12px; color:var(--ink-soft)}
+.chip b{font-family:var(--mono); font-weight:600; color:var(--ink)}
+.chip.c-app b{color:var(--app)} .chip.c-side b{color:var(--side)} .chip.c-infra b{color:var(--infra)} .chip.c-err b{color:var(--err)}
+
+/* controls */
+.controls{display:flex; flex-wrap:wrap; gap:18px 26px; align-items:flex-end; margin:14px 0 16px}
+.knob{display:flex; flex-direction:column; gap:5px; min-width:170px}
+.knob label{font-family:var(--mono); font-size:11.5px; color:var(--ink-soft)}
+.knob label b{color:var(--ink); font-weight:600}
+.knob input[type=range]{width:100%; accent-color:var(--app)}
+.knob select{font-family:var(--body); font-size:14px; padding:7px 10px; border-radius:9px; border:1.5px solid var(--hair); background:#FCFDFC}
+.btnrow{display:flex; flex-wrap:wrap; gap:10px; margin-top:8px}
+.btn{font-family:var(--disp); font-weight:700; font-size:13.5px; border:none; border-radius:999px; padding:9px 18px; cursor:pointer; background:var(--ink); color:#fff}
+.btn:hover{background:#0d1a1f}
+.btn.ghost{background:transparent; color:var(--ink); border:1.5px solid var(--hair)}
+.btn.ghost:hover{background:var(--hair-2)}
+.btn.orange{background:var(--app); color:#fff}
+.btn.orange:hover{background:#9d5314}
+.btn:disabled{opacity:.45; cursor:default}
+.toggle{display:inline-flex; border:1.5px solid var(--hair); border-radius:999px; overflow:hidden}
+.toggle button{font-family:var(--disp); font-weight:700; font-size:12.5px; border:none; background:transparent; color:var(--ink-soft); padding:8px 16px; cursor:pointer}
+.toggle button.on{background:var(--ink); color:#fff}
+.readout{display:flex; flex-wrap:wrap; gap:10px 22px; font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); margin-top:12px}
+.readout b{color:var(--ink); font-weight:600}
+.big-metric{font-family:var(--disp); font-weight:800; font-size:30px; letter-spacing:-.01em}
+canvas.plot{width:100%; height:auto; display:block; background:#FCFDFC; border:1px solid var(--hair-2); border-radius:10px}
+
+/* cards grid used for demand lists etc. */
+.grid{display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:12px; margin:18px 0}
+.gcard{background:#FCFDFC; border:1px solid var(--hair-2); border-radius:10px; padding:13px 15px}
+.gcard .t{font-family:var(--disp); font-weight:700; font-size:14.5px; margin-bottom:3px}
+.gcard .t.a{color:var(--app)} .gcard .t.s{color:var(--side)} .gcard .t.i{color:var(--infra)} .gcard .t.e{color:var(--err)}
+.gcard p{font-size:13.5px; color:var(--ink-soft); margin:0}
+
+/* stacks for the deployment journey */
+.stackwrap{display:flex; gap:14px; align-items:flex-end; flex-wrap:wrap}
+.stackcol{flex:1; min-width:150px}
+.stackcol .colname{font-family:var(--mono); font-size:11px; color:var(--ink-soft); text-align:center; margin-bottom:6px}
+.layer{border-radius:8px; padding:7px 9px; font-family:var(--mono); font-size:11.5px; text-align:center; margin-bottom:5px; border:1px solid var(--hair)}
+.l-app{background:var(--app-soft); color:var(--app); border-color:var(--app)}
+.l-os{background:var(--hair-2); color:var(--ink-soft)}
+.l-guest{background:var(--err-soft); color:var(--err); border-color:var(--err)}
+.l-hyp{background:#EDEBF8; color:#5A4FA3; border-color:#B7B0DE}
+.l-crt{background:var(--side-soft); color:var(--side); border-color:var(--side)}
+.l-hw{background:#101D23; color:#DCE7E2; border-color:#101D23}
+
+/* pods self-heal demo */
+.podrow{display:flex; gap:12px; flex-wrap:wrap; margin:14px 0}
+.podchip{flex:1; min-width:110px; border:1.5px solid var(--infra); background:var(--infra-soft); color:var(--infra); border-radius:12px; padding:12px 10px; text-align:center; font-family:var(--disp); font-weight:700; font-size:14px; cursor:pointer; transition:transform .12s}
+.podchip:hover{transform:translateY(-2px)}
+.podchip .st{display:block; font-family:var(--mono); font-weight:400; font-size:10.5px; margin-top:4px}
+.podchip.dead{border-color:var(--err); background:var(--err-soft); color:var(--err); cursor:default}
+.podchip.starting{border-color:var(--amber); background:#F6ECD6; color:var(--amber); cursor:default}
+
+/* step player scene (section 6) */
+.scene{display:grid; grid-template-columns:1fr auto 1fr; gap:14px; align-items:center; margin:16px 0}
+@media (max-width:640px){ .scene{grid-template-columns:1fr} .scene .mid{display:none} }
+.svc{border:1.5px dashed var(--hair); border-radius:12px; padding:12px; opacity:.35; transition:opacity .25s, border-color .25s}
+.svc.lit{opacity:1; border-style:solid}
+.svc .svcname{font-family:var(--disp); font-weight:700; font-size:14px; margin-bottom:8px}
+.svc .part{border-radius:8px; font-family:var(--mono); font-size:11.5px; text-align:center; padding:7px; margin-top:6px; border:1px solid var(--hair); background:#FCFDFC; color:var(--ink-soft); opacity:.35; transition:opacity .25s}
+.svc .part.lit{opacity:1}
+.part.p-app{background:var(--app-soft); color:var(--app); border-color:var(--app)}
+.part.p-side{background:var(--side-soft); color:var(--side); border-color:var(--side)}
+.part.p-dock{background:#E7F0F7; color:#33607F; border-color:#9DBBD1}
+.scene .mid{font-family:var(--mono); font-size:11px; color:var(--ink-soft); text-align:center; opacity:.3; transition:opacity .25s}
+.scene .mid.lit{opacity:1; color:var(--side)}
+.stepcap{background:#FCFDFC; border:1px solid var(--hair-2); border-radius:10px; padding:12px 15px; font-size:14.5px; min-height:52px}
+.stepcap b{font-family:var(--mono); font-size:12px; color:var(--side)}
+
+/* API builder */
+.urlout{font-family:var(--mono); font-size:13px; background:#101D23; color:#DCE7E2; border-radius:10px; padding:13px 16px; overflow-x:auto; white-space:nowrap; margin-top:12px}
+.urlout .verb{color:#93F7EA; font-weight:600}
+.urlout .seg{color:#F2C48D}
+
+.reveal{opacity:0; transform:translateY(16px); transition:opacity .55s ease, transform .55s ease}
+.reveal.in{opacity:1; transform:none}
+@media (prefers-reduced-motion:reduce){ .reveal{opacity:1; transform:none; transition:none} }
+
+footer{max-width:840px; margin:30px auto 0; padding:34px 20px 60px; border-top:1px solid var(--hair); color:var(--ink-soft); font-size:13.5px}
+
+/* ---------- narrator module CSS ---------- */
+#narrator{position:fixed; right:20px; bottom:20px; z-index:70; display:flex; flex-direction:column; align-items:flex-end; gap:10px}
+.narr-fab{
+  width:52px; height:52px; border-radius:50%; border:none; cursor:pointer;
+  background:var(--ink); color:#fff; font-size:20px; box-shadow:var(--shadow);
+  display:flex; align-items:center; justify-content:center; transition:background .15s, transform .15s;
+}
+.narr-fab:hover{background:#0d1a1f}
+.narr-fab.active{background:var(--model)}
+.narr-fab.speaking{animation:narrpulse 1.4s ease-in-out infinite}
+@keyframes narrpulse{0%,100%{box-shadow:0 0 0 0 rgba(184,100,27,.45)}50%{box-shadow:0 0 0 10px rgba(184,100,27,0)}}
+@media (prefers-reduced-motion:reduce){ .narr-fab.speaking{animation:none} }
+.narr-panel{
+  width:270px; background:var(--card); border:1px solid var(--hair); border-radius:var(--r);
+  box-shadow:var(--shadow); padding:16px; font-size:13.5px;
+}
+.narr-panel h4{margin:0 0 10px; font-family:var(--disp); font-weight:700; font-size:14.5px}
+.narr-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px}
+.narr-row:last-of-type{margin-bottom:0}
+.narr-row select{flex:1; font-size:13px; padding:6px 8px; border-radius:8px}
+.narr-btnrow{display:flex; gap:8px; margin-top:2px}
+.btn.small{padding:6px 12px; font-size:12.5px}
+.narr-status{margin-top:10px; padding-top:10px; border-top:1px solid var(--hair-2); color:var(--ink-soft); font-family:var(--mono); font-size:11.5px; min-height:16px}
+.narr-status b{color:var(--model); font-weight:600}
+#rail a .dot{display:none; width:6px; height:6px; border-radius:50%; background:var(--model); margin-left:auto}
+#rail a.speaking .dot{display:inline-block; animation:narrpulse2 1.2s ease-in-out infinite}
+@keyframes narrpulse2{0%,100%{opacity:1}50%{opacity:.25}}
+
+/* ---------- engagement module CSS ---------- */
+.likebtn{
+  display:inline-flex; align-items:center; gap:8px; border:1.5px solid var(--hair); background:var(--card);
+  border-radius:999px; padding:7px 16px; font-family:var(--body); font-size:13.5px; font-weight:600;
+  color:var(--ink-soft); cursor:pointer; margin:2px 0 20px; transition:border-color .15s, color .15s, background .15s;
+}
+.likebtn:hover{border-color:var(--model)}
+.likebtn.liked{border-color:var(--model); color:var(--model); background:var(--model-soft); cursor:default}
+.likebtn .hrt{font-size:15px}
+.ctextarea{width:100%; font-family:var(--body); font-size:14.5px; padding:11px 14px; border-radius:10px; border:1.5px solid var(--hair); resize:vertical; background:#FCFDFC}
+.ctextarea:focus{outline:none; border-color:var(--model)}
+.clist{display:flex; flex-direction:column; gap:12px; margin-top:18px}
+.ccard{border:1px solid var(--hair-2); border-radius:10px; padding:12px 15px; background:#FCFDFC}
+.ccard .cname{font-weight:600; font-size:13.5px}
+.ccard .cbody{font-size:14px; margin-top:4px; white-space:pre-wrap; color:var(--ink)}
+.modalbg{position:fixed; inset:0; background:rgba(22,38,44,.45); z-index:90; display:flex; align-items:center; justify-content:center; padding:20px}
+.modalbg[hidden]{display:none} /* REQUIRED — see gotchas: author display beats UA [hidden] rule */
+.modalbox{background:var(--card); border-radius:var(--r); padding:26px; width:min(370px,100%); box-shadow:var(--shadow)}
+.modalbox h4{margin:0 0 6px; font-family:var(--disp); font-weight:700; font-size:17px}
+.modalbox input{width:100%; font-family:var(--body); font-size:14.5px; padding:10px 13px; border-radius:9px; border:1.5px solid var(--hair); margin-top:10px; background:#FCFDFC}
+.modalbox input:focus{outline:none; border-color:var(--model)}
+:focus-visible{outline:2.5px solid var(--side); outline-offset:2px}
+</style>
+</head>
+<body>
+
+<div id="topbar">
+  <div class="inner">
+    <div class="brand">Groundwork <span>/ Cloud Native to Dapr</span></div>
+    <div id="podmeter" aria-hidden="true">
+      <span class="lbl">your service:</span>
+      <div class="podshell"><div class="appfill" id="pmApp"></div><div class="sidefill" id="pmSide"></div></div>
+      <span class="lbl">plumbing → sidecar <b id="pmPct">0%</b></span>
+    </div>
+  </div>
+</div>
+
+<nav id="rail" aria-label="Sections">
+  <a href="#top" data-sec="top"><span class="idx">◦</span>Intro<span class="dot"></span></a>
+  <a href="#s1" data-sec="s1"><span class="idx">01</span>Why cloud native<span class="dot"></span></a>
+  <a href="#s2" data-sec="s2"><span class="idx">02</span>Containers &amp; K8s<span class="dot"></span></a>
+  <a href="#s3" data-sec="s3"><span class="idx">03</span>Cross-cutting concerns<span class="dot"></span></a>
+  <a href="#s4" data-sec="s4"><span class="idx">04</span>The Dapr approach<span class="dot"></span></a>
+  <a href="#s5" data-sec="s5"><span class="idx">05</span>Building blocks<span class="dot"></span></a>
+  <a href="#s6" data-sec="s6"><span class="idx">06</span>Running Dapr<span class="dot"></span></a>
+  <a href="#s7" data-sec="s7"><span class="idx">07</span>Recap<span class="dot"></span></a>
+  <a href="#comments" data-sec="comments"><span class="idx">◦</span>Comments<span class="dot"></span></a>
+</nav>
+
+<header id="top" class="hero">
+  <div>
+    <span class="eyebrow">Architecture &amp; engineering deep-dive</span>
+    <h1>Cloud Native<br>to <em>Dapr</em></h1>
+    <p class="lede">Every microservice you ship drags the same invisible cargo: discovery, state, messaging, secrets, retries, telemetry. This walkthrough builds up from <span class="kw-app">why cloud native exists</span>, through <span class="kw-side">containers and Kubernetes</span>, to the sidecar runtime that lifts that cargo out of your code — with live demos you can poke along the way.</p>
+    <a class="cta" href="#s1">Start at the beginning ↓</a>
+  </div>
+  <div class="heropod" aria-hidden="true">
+    <div class="podlabel">One Kubernetes pod</div>
+    <div class="row">
+      <div class="hp-box hp-app"><div class="t">Application</div><div class="s">your business logic</div></div>
+      <div class="hp-link"><span>http / gRPC</span><span class="wire"></span><span>localhost</span></div>
+      <div class="hp-box hp-side"><div class="t">Dapr sidecar</div><div class="s">the building blocks</div></div>
+    </div>
+    <div class="under">The whole article in one picture: two processes, one pod. Your code on the left, the plumbing on the right, a local wire in between. By the end you'll know exactly why this shape wins.</div>
+  </div>
+</header>
+
+<section id="s1" class="chapter reveal">
+  <div class="chapnum">01 · Why cloud native</div>
+  <h2>The demands modern apps must meet</h2>
+  <p>"Cloud native" isn't a technology, it's a checklist of expectations. A payments service, a storefront, a booking system — whatever the app — the business now assumes it will keep running through traffic spikes, hardware failures, and its own upgrades, without anyone noticing. That assumption didn't exist twenty years ago. A single server going down used to just mean a bad afternoon. Now it has to mean nothing at all.</p>
+  <p>Six properties make up that checklist, and each one pushes back on how software used to be built:</p>
+  <div class="grid">
+    <div class="gcard"><div class="t a">Scalable</div><p>Grows with load and traffic — designed to scale as the business scales, not re-architected every time it does.</p></div>
+    <div class="gcard"><div class="t s">Resilient</div><p>Withstands component failures, up to a full cloud-region outage, and stays functional throughout.</p></div>
+    <div class="gcard"><div class="t i">Elastic</div><p>Adds and removes running instances automatically as demand rises and falls — capacity that breathes.</p></div>
+    <div class="gcard"><div class="t a">Always on</div><p>Runs 24×7×365. No downtime, even while it's being upgraded or patched underneath you.</p></div>
+    <div class="gcard"><div class="t s">Secure</div><p>Protects data and transactions against fraud and attack at every layer, not just the perimeter.</p></div>
+    <div class="gcard"><div class="t i">Independent</div><p>Services develop, deploy and release on their own cadence — aligned with agile teams working in parallel.</p></div>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">Analogy</span>
+    <p>Think of a restaurant that only ever plans for its slowest Tuesday lunch. One food-blogger review and a queue forms out the door — no extra tables, no extra cooks, and the kitchen catches fire from a single failing burner because there's no backup ring. Cloud native is the restaurant that keeps a bank of foldable tables in the back, cross-trains every cook on every station, and can lose a burner without the dinner rush even noticing. The tables and cross-training cost something up front. That's the trade this whole article is really about.</p>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">Formalizing "always on"</span>
+    <p>"Always on" is usually promised as a number, not a feeling — an <b>availability target</b>, written as a percentage of "nines." If <span class="eq-inline" data-tex="A">A</span> is the fraction of time the system must be up over a period of length <span class="eq-inline" data-tex="T">T</span>, the downtime budget it leaves you is:</p>
+    <div class="eq" data-tex="D = (1-A)\times T">D = (1&minus;A) &times; T</div>
+    <div class="glossary">
+      <span class="chip"><b>A</b> — availability target, e.g. 0.999 for "three nines"</span>
+      <span class="chip"><b>T</b> — the period measured, here one calendar year</span>
+      <span class="chip"><b>D</b> — allowed downtime within that period</span>
+    </div>
+    <p class="note" style="margin-top:12px">This is why teams argue over a single extra "9": going from 99.9% to 99.99% doesn't sound like much, but it shrinks the whole year's allowed downtime by 10×.</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Try it — the nines calculator</span>
+    <p>Drag the target and watch how little slack each extra nine actually leaves.</p>
+    <div class="controls">
+      <div class="knob">
+        <label>Availability target: <b id="nineVal">99.9%</b></label>
+        <input type="range" id="nineSlider" min="0" max="4" step="1" value="1">
+      </div>
+    </div>
+    <div class="readout" id="nineReadout"></div>
+  </div>
+
+  <h3>What "cloud native" actually means in practice</h3>
+  <p>The six demands above are the <em>why</em>. The practice that emerged to satisfy them has its own checklist — built on cloud infrastructure, split into microservices, shipped as containers, talking through contracts instead of shared code, coordinated by an orchestrator, released independently, spread across clouds, with total cost of ownership always in view. Every later section in this article is really an elaboration of one item on that list.</p>
+
+  <div class="panel">
+    <span class="tag">Cloud native by example</span>
+    <p><b>Elasticity</b> — on a normal day, two instances of the storefront handle all traffic comfortably. On a sale day, two instances fall over — so the platform notices the queue building and adds instances automatically, then removes them once the peak passes. Nobody paged anyone.</p>
+    <p><b>Resiliency</b> — a single checkout request touches the catalog, the cart, and the payment service. If payment goes down, a resilient storefront doesn't fail the whole request — it degrades gracefully, shows a clear "try again shortly" message on checkout, and keeps the catalog and cart online for everyone else.</p>
+  </div>
+</section>
+
+<section id="s2" class="chapter reveal">
+  <div class="chapnum">02 · Containers &amp; Kubernetes</div>
+  <h2>The platform underneath</h2>
+  <p>Cloud native sets the demands; something has to actually run the software that meets them. That something went through three distinct eras, each solving the isolation problem the previous one left half-finished.</p>
+
+  <div class="panel">
+    <span class="tag">The deployment journey</span>
+    <div class="controls">
+      <div class="toggle" role="tablist" aria-label="Deployment era">
+        <button class="on" data-stack="trad">Traditional</button>
+        <button data-stack="vm">Virtualized</button>
+        <button data-stack="ctr">Container</button>
+      </div>
+    </div>
+    <div class="stackwrap" id="stackWrap"></div>
+    <p class="note" id="stackCaption" style="margin-top:10px"></p>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">Analogy</span>
+    <p>Traditional deployment is one big house with no interior walls — one messy tenant's clutter spills into everyone else's room. Virtualization builds separate houses, each with its own foundation, plumbing, and utilities, which is safe but expensive to duplicate. Containers are more like apartments in one building: separate units with locked doors (isolation), sharing the building's foundation and pipes (the host kernel) instead of each pouring their own concrete.</p>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">Why VMs cost more per app</span>
+    <p>Each VM ships a full guest operating system alongside the app; each container shares the host kernel and ships only the app and its libraries. If <span class="eq-inline" data-tex="n">n</span> app instances each need a guest OS of size <span class="eq-inline" data-tex="g">g</span> versus one shared host kernel, the fixed overhead paid <em>per instance</em> is:</p>
+    <div class="eq" data-tex="O_{vm} = n\times g \qquad O_{ctr} \approx 0">O<sub>vm</sub> = n &times; g&nbsp;&nbsp;&nbsp;&nbsp;O<sub>ctr</sub> &asymp; 0</div>
+    <div class="glossary">
+      <span class="chip"><b>n</b> — number of running instances</span>
+      <span class="chip"><b>g</b> — size/overhead of one guest OS</span>
+      <span class="chip"><b>O</b> — total OS overhead paid across all instances</span>
+    </div>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Try it — overhead at scale</span>
+    <p>Move the instance count and watch the guest-OS tax on VMs grow while the container line stays flat.</p>
+    <div class="controls">
+      <div class="knob"><label>Instances: <b id="instVal">10</b></label><input type="range" id="instSlider" min="1" max="200" step="1" value="10"></div>
+    </div>
+    <canvas class="plot" id="overheadPlot" width="760" height="240"></canvas>
+    <div class="readout" id="overheadReadout"></div>
+  </div>
+
+  <h3>Docker, images, and containers</h3>
+  <p>Three words get used almost interchangeably and shouldn't be. A <b>container</b> is a lightweight, running package of app code plus its exact runtime and library dependencies — decoupled from the host so it behaves identically anywhere. An <b>image</b> is the immutable template that container is started from; a container is one running instance of an image, the same way an object is one instance of a class. <b>Docker</b> is the tooling that builds, ships, and runs both. A Java image, for example, stacks an OS layer, a JVM, your app, and its JARs — so <code>docker run</code> reproduces that exact environment on any host, laptop or cloud.</p>
+
+  <h3>Why orchestration is needed</h3>
+  <p>Containers don't run themselves in production. Once you have many instances of many services, someone has to keep answering four questions continuously: which healthy instance serves this request, is each instance actually healthy, how do we absorb a traffic burst, and how do services find each other by name instead of a fragile IP address. Kubernetes is the system that answers all four, permanently, without a human in the loop.</p>
+
+  <div class="panel demo">
+    <span class="tag">Try it — self-healing pods</span>
+    <p>Click a pod to kill it. Watch Kubernetes notice and replace it — this is the "orchestrator" doing its job, not magic.</p>
+    <div class="podrow" id="podRow"></div>
+    <div class="readout" id="podReadout"><span>Healthy pods: <b id="podHealthy">3</b>/3</span><span>Restarts so far: <b id="podRestarts">0</b></span></div>
+  </div>
+
+  <h3>Kubernetes' core objects</h3>
+  <div class="grid">
+    <div class="gcard"><div class="t s">Pod</div><p>The smallest deployable unit — a single instance of a running process. Holds one or more containers sharing network and storage. Pods are ephemeral by design.</p></div>
+    <div class="gcard"><div class="t i">Service</div><p>A stable abstraction over a set of Pods — one IP and DNS name, load-balanced across them. Pods come and go; the Service endpoint stays put.</p></div>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">From cloud-native to Kubernetes-native</span>
+    <p>Hybrid cloud is supposed to avoid lock-in by letting you fail over between providers — but each provider ships its own CLI, its own service discovery, its own event protocol, so deploying the same app everywhere <em>automatically</em> was effectively impossible. Standardizing on Kubernetes gives every provider the same portable deployment surface. Kubernetes-native isn't a departure from cloud-native — it's cloud-native with one concrete, common substrate underneath.</p>
+  </div>
+</section>
+
+<section id="s3" class="chapter reveal">
+  <div class="chapnum">03 · Cross-cutting concerns</div>
+  <h2>The gap Kubernetes leaves open</h2>
+  <p>Kubernetes solves scheduling, health, scaling, and naming — for the <em>container</em>. It has no opinion on what's running inside that container. A real application is many services calling each other, and every one of them independently has to solve the same handful of distributed-systems problems: how do I find and call another service, how do I persist and share state, how do I send an async message, how do I fetch a secret, how do I retry a failing call without hammering it forever, how do I emit logs and traces anyone can actually read. Kubernetes runs the box. Nobody built what goes inside it for you.</p>
+
+  <div class="panel">
+    <span class="tag">The seven building blocks every service needs</span>
+    <div class="grid">
+      <div class="gcard"><div class="t a">Service invocation</div><p>Discover and call other services reliably.</p></div>
+      <div class="gcard"><div class="t a">State management</div><p>Persist and share state across services.</p></div>
+      <div class="gcard"><div class="t a">Publish / subscribe</div><p>Async messaging between services.</p></div>
+      <div class="gcard"><div class="t a">Secrets</div><p>Fetch credentials from a secret store.</p></div>
+      <div class="gcard"><div class="t a">Bindings</div><p>Connect to external systems &amp; events.</p></div>
+      <div class="gcard"><div class="t a">Resiliency</div><p>Retries, timeouts, and circuit breaking.</p></div>
+      <div class="gcard"><div class="t a">Observability</div><p>Logs, metrics, and distributed traces.</p></div>
+    </div>
+    <p class="note">Same seven, every service. The whole rest of this article is one idea: build these once, not per team.</p>
+  </div>
+
+  <p>Traditionally these seven ship as a framework library compiled straight into every service. The business logic ends up as a thin sliver wrapped in a thick shell of plumbing — the JVM (or Node runtime, or .NET runtime) hosts a framework library, and your actual code is a small guest inside its own container.</p>
+
+  <div class="panel analogy">
+    <span class="tag">Analogy</span>
+    <p>It's like every restaurant in a chain building its own walk-in fridge, its own point-of-sale system, and its own staff-scheduling software from scratch — in whatever "language" that location happens to speak. Some franchises end up with excellent fridges and terrible scheduling software, because one team is good at refrigeration and bad at scheduling. Nobody chose that; it's just what happens when every location re-solves every problem alone.</p>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">The polyglot tax, quantified</span>
+    <p>If an organization runs <span class="eq-inline" data-tex="N">N</span> services written across <span class="eq-inline" data-tex="L">L</span> different languages, and each of the seven building blocks needs its own port per language, the number of separate plumbing implementations that must be built and kept in sync is:</p>
+    <div class="eq" data-tex="I_{lib} = 7 \times L \qquad I_{sidecar} = 7">I<sub>lib</sub> = 7 &times; L&nbsp;&nbsp;&nbsp;&nbsp;I<sub>sidecar</sub> = 7</div>
+    <div class="glossary">
+      <span class="chip"><b>N</b> — number of services</span>
+      <span class="chip"><b>L</b> — number of distinct languages/runtimes in use</span>
+      <span class="chip"><b>I</b> — distinct plumbing implementations that must exist</span>
+    </div>
+    <p class="note" style="margin-top:12px">Notice <span data-tex="N">N</span> doesn't even appear in either formula — duplication scales with how many <em>languages</em> you support, not how many services you run. A sidecar's implementation count is flat at 7, no matter how many services or languages join later.</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Try it — count the duplication</span>
+    <p>Set how many services and how many languages a fleet uses, and compare the two approaches head-to-head.</p>
+    <div class="controls">
+      <div class="knob"><label>Services (<b id="tN">12</b>)</label><input type="range" id="taxN" min="1" max="60" step="1" value="12"></div>
+      <div class="knob"><label>Languages (<b id="tL">3</b>)</label><input type="range" id="taxL" min="1" max="6" step="1" value="3"></div>
+    </div>
+    <canvas class="plot" id="taxPlot" width="760" height="220"></canvas>
+    <div class="readout" id="taxReadout"></div>
+  </div>
+
+  <h3>Why the shared-library approach hurts</h3>
+  <div class="grid">
+    <div class="gcard"><div class="t e">Vendor lock-in</div><p>The SDK binds your code to one provider's API. Switching a queue, database, or secret store means rewriting and redeploying every service that touches it.</p></div>
+    <div class="gcard"><div class="t e">Duplication</div><p>The same plumbing is embedded and version-pinned in every service. One upstream change forces coordinated updates across the whole fleet at once.</p></div>
+    <div class="gcard"><div class="t e">Polyglot tax</div><p>Each language needs its own port of the library. Java, Go, .NET, and Python teams re-solve the same problem in parallel, independently.</p></div>
+  </div>
+</section>
+
+<section id="s4" class="chapter reveal">
+  <div class="chapnum">04 · The Dapr approach</div>
+  <h2>Sidecar runtime &amp; component model</h2>
+  <p>Dapr — <b>D</b>istributed <b>Ap</b>plication <b>R</b>untime — takes the seven building blocks out of your compiled code and runs them as a separate process, alongside your app, in the same Pod. Your app talks to that process over plain local HTTP or gRPC calls. It is a graduated CNCF project since 2024 — the same top tier as Kubernetes, Istio, and Prometheus — precisely because "run the plumbing next door instead of inside" turned out to generalize far beyond any one team's stack.</p>
+
+  <div class="panel">
+    <span class="tag">The sidecar pattern, three guarantees</span>
+    <div class="grid">
+      <div class="gcard"><div class="t s">Separate process</div><p>Not a library linked into your app — its own OS process, with its own lifecycle.</p></div>
+      <div class="gcard"><div class="t s">Local HTTP/gRPC</div><p>Talks to the app over a fast local call, not a remote network hop.</p></div>
+      <div class="gcard"><div class="t s">Language-agnostic</div><p>The exact same sidecar binary works next to Java, Go, Python, or Node — no per-language SDK to port.</p></div>
+    </div>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">Analogy</span>
+    <p>A sidecar is like hiring a bilingual local fixer in a foreign city instead of teaching every visiting employee the language, the transit system, and who to bribe for a permit. The fixer rides alongside each visitor, handles the local specifics through one simple conversation ("get me a permit"), and can be swapped for a different fixer in a different city without the visitor changing how they ask.</p>
+  </div>
+
+  <h3>Library vs. sidecar, side by side</h3>
+  <div class="stackwrap">
+    <div class="stackcol">
+      <div class="colname">BEFORE — embedded library</div>
+      <div class="layer l-app">Business code</div>
+      <div class="layer l-guest">Framework library</div>
+      <div class="layer l-crt">Runtime (JVM)</div>
+      <p class="note" style="margin-top:8px">Plumbing compiled into every service, per language.</p>
+    </div>
+    <div class="stackcol">
+      <div class="colname">AFTER — Dapr sidecar</div>
+      <div class="layer l-app">Business code <span style="opacity:.6">(app container)</span></div>
+      <div class="layer l-side" style="background:var(--side-soft); color:var(--side); border-color:var(--side)">Dapr sidecar — building blocks</div>
+      <p class="note" style="margin-top:8px">Business logic only; plumbing delegated over a standard local API.</p>
+    </div>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">The component model</span>
+    <p>Your app calls one stable API. Which real backend answers that call is chosen entirely by a YAML file the sidecar reads at startup — a pluggable <b>component</b>. Swapping a backend means editing that file, not touching application code:</p>
+    <pre>apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  <span class="yk">name:</span> <span class="yv">statestore</span>
+<span class="yk">spec:</span>
+  <span class="yk">type:</span> <span class="yv">state.redis</span>       <span class="yc"># ← change this line to state.postgresql</span>
+  <span class="yk">metadata:</span>
+    - <span class="yk">name:</span> <span class="yv">redisHost</span>
+      <span class="yk">value:</span> <span class="yv">localhost:6379</span></pre>
+    <div class="glossary">
+      <span class="chip c-side"><b>type</b> — which component implementation the sidecar loads</span>
+      <span class="chip c-side"><b>metadata</b> — connection details specific to that backend</span>
+      <span class="chip c-infra"><b>your app</b> — never sees this file, never changes</span>
+    </div>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Try it — swap the backend</span>
+    <p>Your app's call never changes. Pick a different backend and watch only the YAML — and the arrow pointing at a different box — update.</p>
+    <div class="controls">
+      <div class="knob">
+        <label>State store backend</label>
+        <select id="backendSelect">
+          <option value="redis">Redis</option>
+          <option value="postgres">PostgreSQL</option>
+          <option value="mysql">MySQL</option>
+        </select>
+      </div>
+    </div>
+    <pre id="backendYaml"></pre>
+    <div class="readout"><span>Application code changed: <b id="backendAppChanged" style="color:var(--infra)">0 lines</b></span></div>
+  </div>
+</section>
+
+<section id="s5" class="chapter reveal">
+  <div class="chapnum">05 · Building blocks in detail</div>
+  <h2>Invocation, state, pub/sub &amp; more</h2>
+  <p>Five of the seven building blocks are pluggable APIs you call directly — invocation, state, pub/sub, secrets, bindings. The other two, resiliency and observability, aren't APIs you call at all; Dapr applies them <em>underneath</em> every one of the other five, automatically, because every hop already passes through a sidecar that can retry it, time it out, and trace it.</p>
+
+  <h3>Service-to-service invocation</h3>
+  <p>One service calls another by a logical <b>app-id</b>, never an IP address. The call leaves the Employee sidecar, crosses to the Department sidecar over an encrypted mTLS connection, and lands on the Department app — automatic retries and full tracing included, with zero retry or TLS code written by either team.</p>
+  <div class="grid">
+    <div class="gcard"><div class="t s">Name resolution</div><p>Call by app-id, not IP.</p></div>
+    <div class="gcard"><div class="t s">mTLS in transit</div><p>Encryption between sidecars, by default.</p></div>
+    <div class="gcard"><div class="t s">Retries</div><p>Automatic, policy-driven, no code.</p></div>
+    <div class="gcard"><div class="t s">Tracing</div><p>Every hop is observable end to end.</p></div>
+  </div>
+
+  <h3>State management</h3>
+  <p>Services often need to remember something beyond a single request, and share it with other services. Dapr gives every language the same two calls — <code>getState</code> / <code>setState</code> — against whichever store is configured, with no store-specific SDK anywhere in the app.</p>
+
+  <h3>Publish / subscribe</h3>
+  <p>Loosely coupled, asynchronous messaging — the publisher never knows or cares who subscribes. The broker (Kafka, RabbitMQ, MQTT, Redis Streams) is a YAML choice, so the messaging technology underneath can change without touching a single service.</p>
+
+  <h3>Secrets</h3>
+  <p>Apps need credentials to reach the outside world, but embedding a cloud provider's secrets SDK in every service is exactly the lock-in this whole approach exists to avoid. One call handles it everywhere:</p>
+  <pre>password = dapr.getSecret(<span class="yv">"db-password"</span>)</pre>
+  <p>The vault behind that call is a YAML choice too — HashiCorp Vault, Azure Key Vault, AWS Secrets Manager, or GCP Secret Manager, picked per environment, never per line of app code.</p>
+
+  <h3>Bindings</h3>
+  <p>Bindings connect to on-premises or cloud resources — SMTP, Twilio, cloud queues, cron, webhooks — without embedding any of their SDKs in every service. An <b>input binding</b> means an external event triggers your app; an <b>output binding</b> means your app invokes an external system. Either way, a change to the external connector touches configuration, not code, in every microservice that uses it.</p>
+
+  <div class="panel mathp">
+    <span class="tag">Resiliency, quantified</span>
+    <p>A retry policy's whole point is to turn one unreliable call into several chances at a reliable outcome. If a single attempt succeeds with probability <span class="eq-inline" data-tex="p">p</span>, and the sidecar retries up to <span class="eq-inline" data-tex="k">k</span> times on failure, the probability that <em>at least one</em> of those attempts succeeds is:</p>
+    <div class="eq" data-tex="P_{success} = 1 - (1-p)^{k}">P<sub>success</sub> = 1 &minus; (1&minus;p)<sup>k</sup></div>
+    <div class="glossary">
+      <span class="chip"><b>p</b> — probability a single call succeeds</span>
+      <span class="chip"><b>k</b> — number of attempts (1 original + retries)</span>
+      <span class="chip"><b>P<sub>success</sub></b> — probability at least one attempt lands</span>
+    </div>
+    <p class="note" style="margin-top:12px">This is declarative policy the sidecar enforces — retries, timeouts to bound how long any call may wait, and circuit breaking to stop calling a dependency that's clearly down until it recovers — none of it is conditional logic scattered through your services.</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Try it — retries vs. reliability</span>
+    <p>A flaky dependency that only succeeds 70% of the time on its own looks a lot better after a few automatic retries.</p>
+    <div class="controls">
+      <div class="knob"><label>Per-call success rate: <b id="pVal">70%</b></label><input type="range" id="pSlider" min="10" max="99" step="1" value="70"></div>
+      <div class="knob"><label>Retry attempts: <b id="kVal">3</b></label><input type="range" id="kSlider" min="1" max="8" step="1" value="3"></div>
+    </div>
+    <canvas class="plot" id="retryPlot" width="760" height="220"></canvas>
+    <div class="readout"><span>P(success) after <b id="kValR">3</b> attempts: <b class="big-metric" id="retryBig" style="font-size:20px">–</b></span></div>
+  </div>
+
+  <h3>Observability</h3>
+  <p>All traffic already flows through sidecars, so Dapr emits logs, metrics, and traces automatically, in the OpenTelemetry format — pointed at Zipkin, Jaeger, or Prometheus/Grafana. Nobody had to instrument a single service by hand for the sidecar's own hops to become visible.</p>
+</section>
+
+<section id="s6" class="chapter reveal">
+  <div class="chapnum">06 · Running Dapr</div>
+  <h2>Hosting modes &amp; a first app</h2>
+  <p>Dapr runs in two places. <b>Self-hosted</b> mode runs the sidecar as a local process on your machine — the fast path for development — and can also run on VMs to serve real production workloads. <b>Kubernetes</b> mode injects the sidecar into every Pod automatically; it runs on any supported Kubernetes version, and includes minikube for local development and testing before anything touches a real cluster.</p>
+
+  <div class="panel">
+    <span class="tag">The tutorial application</span>
+    <p>Two Spring Boot services — <b>Employee</b> and <b>Department</b> — with CRUD across both, each running its own Dapr sidecar, deployed together on Google Kubernetes Engine (GKE).</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Try it — step through a service call</span>
+    <p>Press play and watch a single request cross from one service to another entirely through sidecars — no direct network code in either app.</p>
+    <div class="scene" id="scene">
+      <div class="svc" id="svcEmployee">
+        <div class="svcname">Employee service</div>
+        <div class="part p-app" data-part="app1">Business code</div>
+        <div class="part p-side" data-part="side1">Dapr sidecar</div>
+      </div>
+      <div class="mid" id="sceneMid">http / gRPC<br>↔<br>mTLS</div>
+      <div class="svc" id="svcDepartment">
+        <div class="svcname">Department service</div>
+        <div class="part p-side" data-part="side2">Dapr sidecar</div>
+        <div class="part p-app" data-part="app2">Business code</div>
+      </div>
+    </div>
+    <div class="stepcap" id="stepCaption"><b>Step 0/5</b> — press play to begin.</div>
+    <div class="btnrow">
+      <button class="btn orange" id="stepPlay">▶ Play</button>
+      <button class="btn ghost" id="stepPrev">← Back</button>
+      <button class="btn ghost" id="stepNext">Next →</button>
+      <button class="btn ghost" id="stepReset">Reset</button>
+    </div>
+  </div>
+
+  <h3>Building a first app with Dapr</h3>
+  <div class="grid">
+    <div class="gcard"><div class="t s">Part one — first app</div><p>Develop the Spring Boot Employee service → test it standalone → add the Dapr sidecar → containerize with Docker → deploy to minikube.</p></div>
+    <div class="gcard"><div class="t i">Part two — add service-to-service</div><p>Develop Department → call it from Employee via Dapr → add its sidecar → containerize → deploy to minikube.</p></div>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">Try it — build a request URL</span>
+    <p>Every Dapr building-block call is the same local HTTP shape: talk to your own sidecar, name the block, name the target. Pick the pieces below and watch the real request assemble.</p>
+    <div class="controls">
+      <div class="knob"><label>Building block</label>
+        <select id="urlBlock">
+          <option value="invoke">Service invocation</option>
+          <option value="state">State</option>
+          <option value="pubsub">Publish</option>
+          <option value="secrets">Secrets</option>
+        </select>
+      </div>
+      <div class="knob"><label>Sidecar port</label>
+        <select id="urlPort"><option>3500</option><option>3501</option><option>3502</option></select>
+      </div>
+      <div class="knob" id="urlTargetWrap"><label id="urlTargetLabel">Target app-id</label>
+        <select id="urlTarget"><option value="department-service">department-service</option><option value="employee-service">employee-service</option></select>
+      </div>
+    </div>
+    <div class="urlout" id="urlOut"></div>
+  </div>
+</section>
+
+<section id="s7" class="chapter reveal">
+  <div class="chapnum">07 · Recap</div>
+  <h2>What Dapr gives you</h2>
+  <div class="grid">
+    <div class="gcard"><div class="t s">Invocation</div><p>Discover and call other services by app-id.</p></div>
+    <div class="gcard"><div class="t s">State</div><p>getState / setState against any configured store.</p></div>
+    <div class="gcard"><div class="t s">Pub/sub</div><p>Async messaging through a swappable broker.</p></div>
+    <div class="gcard"><div class="t s">Secrets</div><p>One call, any vault, chosen in YAML.</p></div>
+    <div class="gcard"><div class="t s">Bindings</div><p>External systems wired in through configuration.</p></div>
+    <div class="gcard"><div class="t i">Resiliency</div><p>Retries, timeouts, circuit breaking — applied throughout.</p></div>
+    <div class="gcard"><div class="t i">Observability</div><p>Logs, metrics, and traces, emitted automatically.</p></div>
+  </div>
+  <p class="note">Invocation, state, pub/sub, secrets, and bindings are pluggable APIs. Resiliency and observability are cross-cutting concerns Dapr applies underneath all five, not APIs you call directly.</p>
+  <p>Your services shrink back down to <span class="kw-app">business logic</span> — the plumbing becomes portable across clouds and across languages, because it never lived inside your code in the first place.</p>
+
+  <div class="panel">
+    <span class="tag">Key takeaways</span>
+    <ol style="padding-left:20px; margin:0">
+      <li style="margin-bottom:10px">Cloud native sets the demands: scalable, resilient, elastic, always-on, secure, independent.</li>
+      <li style="margin-bottom:10px">Kubernetes runs and connects the containers — but leaves the cross-cutting concerns to each service.</li>
+      <li style="margin-bottom:10px">The shared-library approach brings vendor lock-in, duplication, and a polyglot tax that scales with every new language.</li>
+      <li>Dapr's sidecar and component model remove all three at once — swap backends by editing YAML, keep the code itself focused only on business logic.</li>
+    </ol>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">Common pitfalls</span>
+    <p>Treating Dapr as a place to put business logic — it's a runtime you call, not a framework you build inside; your code should still run and mean something with the sidecar turned off. Forgetting that a component swap in YAML is still a production change: a new backend has its own latency and failure characteristics even though the calling code didn't move. And skipping observability because "the sidecar handles it" — it emits the telemetry, but someone still has to look at the dashboard.</p>
+  </div>
+
+  <h3>References &amp; next steps</h3>
+  <div class="grid">
+    <div class="gcard"><div class="t s">Dapr docs</div><p><a href="https://docs.dapr.io" target="_blank" rel="noopener">docs.dapr.io</a></p></div>
+    <div class="gcard"><div class="t s">Kubernetes concepts</div><p><a href="https://kubernetes.io/docs" target="_blank" rel="noopener">kubernetes.io/docs</a></p></div>
+    <div class="gcard"><div class="t s">Dapr quickstarts</div><p><a href="https://github.com/dapr/quickstarts" target="_blank" rel="noopener">github.com/dapr/quickstarts</a></p></div>
+  </div>
+  <p class="note">Before next session: install the Dapr CLI and run <code>dapr init</code> in self-hosted mode, run the service-invocation and state quickstarts, and deploy the Employee &amp; Department sample to minikube.</p>
+</section>
+
+<section id="comments" class="chapter reveal">
+  <span class="eyebrow">Join the discussion</span>
+  <h2>Comments</h2>
+  <p class="note" id="commentsConfigNote" hidden>Comments and likes aren't connected to a backend yet — search this file for "SUPABASE_URL" for setup steps. They'll still work on this screen, but won't be saved or shown to other visitors until that's done.</p>
+  <div class="panel demo">
+    <span class="tag">Leave a comment on the chapter</span>
+    <textarea id="cBody" class="ctextarea" rows="3" placeholder="Ask a question, share what clicked for you…"></textarea>
+    <div class="btnrow"><button class="btn orange" id="cSubmit">Post comment</button></div>
+    <div class="note" id="cStatus" style="margin-top:6px"></div>
+    <div class="clist" id="cList"></div>
+  </div>
+</section>
+
+<footer>
+  <p>Groundwork · Cloud Native to Dapr — an interactive engineering deep-dive. Questions, migration paths, or how Dapr fits your current Kubernetes footprint? Use the comments above.</p>
+</footer>
+
+<div id="emailModalBg" class="modalbg" hidden>
+  <div class="modalbox">
+    <h4>One quick thing</h4>
+    <p class="note">Add your name and email so we know who's liking and commenting. We won't spam you, and this browser won't ask again.</p>
+    <input type="text" id="mName" placeholder="Name">
+    <input type="email" id="mEmail" placeholder="you@example.com">
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn orange" id="mContinue">Continue</button>
+      <button class="btn ghost" id="mCancel">Cancel</button>
+    </div>
+    <div class="note" id="mErr" style="color:var(--err); margin-top:8px"></div>
+  </div>
+</div>
+
+<div id="narrator">
+  <div class="narr-panel" id="narrPanel" hidden>
+    <h4>Voice narration</h4>
+    <div class="narr-row">
+      <span>Narrate as I scroll</span>
+      <button id="narrOnOff" class="btn ghost small">Turn on</button>
+    </div>
+    <div class="narr-row">
+      <select id="narrVoice" aria-label="Choose a voice"></select>
+    </div>
+    <div class="narr-btnrow">
+      <button id="narrReplay" class="btn ghost small">Replay section</button>
+      <button id="narrPauseBtn" class="btn ghost small" disabled>Pause</button>
+    </div>
+    <div class="narr-status" id="narrStatus">Off — press "Turn on" to begin.</div>
+  </div>
+  <button id="narrFab" class="narr-fab" aria-label="Open voice narration controls" aria-expanded="false" title="Voice narration">🔊</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer onload="window.__sbReady && window.__sbReady()"></script>
+<script>
+var CONFIG = { SUPABASE_URL:'YOUR_SUPABASE_URL', SUPABASE_ANON_KEY:'YOUR_SUPABASE_ANON_KEY', ARTICLE_ID:'cloud-native-to-dapr' };
+
+function el(id){ return document.getElementById(id); }
+function on(id,ev,fn){ var e=el(id); if(e) e.addEventListener(ev,fn); }
+
+var CSS = getComputedStyle(document.documentElement);
+function col(name){ return CSS.getPropertyValue(name).trim() || '#000'; }
+var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:col('--hair-2'),
+          app:col('--app'), side:col('--side'), infra:col('--infra'), err:col('--err'), amber:col('--amber') };
+
+/* ---------------- KaTeX render with plain-text fallback ---------------- */
+(function(){
+  function renderAll(){
+    if(!window.katex){ return; }
+    document.querySelectorAll('.eq, .eq-inline').forEach(function(node){
+      var tex = node.getAttribute('data-tex'); if(!tex) return;
+      try{
+        katex.render(tex, node, { throwOnError:false, displayMode: node.classList.contains('eq') });
+      }catch(e){ /* leave plain-unicode fallback text already in the node */ }
+    });
+  }
+  if(window.katex){ renderAll(); } else { window.addEventListener('load', renderAll); setTimeout(renderAll, 800); }
+})();
+
+/* ---------------- scroll reveal + rail highlight + topbar meter ---------------- */
+(function(){
+  var reveals = document.querySelectorAll('.reveal');
+  if('IntersectionObserver' in window){
+    var rio = new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); rio.unobserve(e.target); } });
+    }, {threshold:.12});
+    reveals.forEach(function(r){ rio.observe(r); });
+  } else { reveals.forEach(function(r){ r.classList.add('in'); }); }
+
+  var secs = document.querySelectorAll('section.chapter, .hero');
+  var railLinks = document.querySelectorAll('#rail a');
+  var order = ['top','s1','s2','s3','s4','s5','s6','s7','comments'];
+  if('IntersectionObserver' in window){
+    var nav = new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(e.isIntersecting){
+          railLinks.forEach(function(a){ a.classList.toggle('here', a.getAttribute('data-sec')===e.target.id); });
+          var idx = order.indexOf(e.target.id);
+          var pct = idx<0 ? 0 : Math.round((idx/(order.length-1))*100);
+          el('pmSide') && (el('pmSide').style.width = pct+'%');
+          el('pmApp') && (el('pmApp').style.flex = (100-pct));
+          el('pmPct') && (el('pmPct').textContent = pct+'%');
+        }
+      });
+    }, {rootMargin:'-20% 0px -60% 0px'});
+    secs.forEach(function(s){ nav.observe(s); });
+  }
+})();
+
+/* ---------------- s1: nines calculator ---------------- */
+(function(){
+  var levels = [
+    {label:'90%',     A:0.90},
+    {label:'99%',     A:0.99},
+    {label:'99.9%',   A:0.999},
+    {label:'99.99%',  A:0.9999},
+    {label:'99.999%', A:0.99999}
+  ];
+  function fmtDuration(hours){
+    if(hours>=24){ return (hours/24).toFixed(1)+' days'; }
+    if(hours>=1){ return hours.toFixed(1)+' hours'; }
+    return (hours*60).toFixed(0)+' minutes';
+  }
+  function update(){
+    var i = parseInt(el('nineSlider').value,10);
+    var lvl = levels[i];
+    el('nineVal').textContent = lvl.label;
+    var hoursPerYear = 24*365;
+    var downtimeHours = (1-lvl.A)*hoursPerYear;
+    el('nineReadout').innerHTML =
+      '<span>Downtime budget per year: <b>'+fmtDuration(downtimeHours)+'</b></span>'+
+      '<span>Downtime budget per month: <b>'+fmtDuration(downtimeHours/12)+'</b></span>';
+  }
+  on('nineSlider','input',update);
+  if(el('nineSlider')) update();
+})();
+
+/* ---------------- s2: deployment stack toggle ---------------- */
+(function(){
+  var stacks = {
+    trad: {
+      caption:'Apps run directly on the OS with no resource boundaries — one app can starve the others.',
+      cols:[
+        {name:'App A', layers:[['App','l-app'],['Operating system','l-os'],['Hardware','l-hw']]},
+        {name:'App B', layers:[['App','l-app'],['Operating system','l-os'],['Hardware','l-hw']]}
+      ], shared:true
+    },
+    vm: {
+      caption:'A hypervisor isolates each app in its own VM — but every VM ships a full guest OS.',
+      cols:[
+        {name:'VM 1', layers:[['App','l-app'],['Bins/Lib','l-os'],['Guest OS','l-guest']]},
+        {name:'VM 2', layers:[['App','l-app'],['Bins/Lib','l-os'],['Guest OS','l-guest']]},
+      ], shared:false, extra:[['Hypervisor','l-hyp'],['Operating system','l-os'],['Hardware','l-hw']]
+    },
+    ctr: {
+      caption:'Containers share the host OS kernel — isolated, lightweight, and portable across clouds.',
+      cols:[
+        {name:'Ctr 1', layers:[['App','l-app'],['Bins/Lib','l-os']]},
+        {name:'Ctr 2', layers:[['App','l-app'],['Bins/Lib','l-os']]},
+        {name:'Ctr 3', layers:[['App','l-app'],['Bins/Lib','l-os']]}
+      ], shared:false, extra:[['Container runtime','l-crt'],['Operating system','l-os'],['Hardware','l-hw']]
+    }
+  };
+  function render(key){
+    var s = stacks[key], wrap = el('stackWrap'); wrap.innerHTML='';
+    s.cols.forEach(function(c){
+      var col = document.createElement('div'); col.className='stackcol';
+      var name = document.createElement('div'); name.className='colname'; name.textContent=c.name; col.appendChild(name);
+      c.layers.forEach(function(l){ var d=document.createElement('div'); d.className='layer '+l[1]; d.textContent=l[0]; col.appendChild(d); });
+      wrap.appendChild(col);
+    });
+    if(s.extra){
+      var shared = document.createElement('div'); shared.className='stackcol'; shared.style.flexBasis='100%'; shared.style.marginTop='4px';
+      var name = document.createElement('div'); name.className='colname'; name.textContent='Shared underneath'; shared.appendChild(name);
+      s.extra.forEach(function(l){ var d=document.createElement('div'); d.className='layer '+l[1]; d.textContent=l[0]; shared.appendChild(d); });
+      wrap.appendChild(shared);
+    }
+    el('stackCaption').textContent = s.caption;
+  }
+  document.querySelectorAll('[data-stack]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      document.querySelectorAll('[data-stack]').forEach(function(b){ b.classList.remove('on'); });
+      btn.classList.add('on');
+      render(btn.getAttribute('data-stack'));
+    });
+  });
+  if(el('stackWrap')) render('trad');
+})();
+
+/* ---------------- s2: overhead plot ---------------- */
+(function(){
+  var canvas = el('overheadPlot'); if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var GUEST_OS_MB = 700; // representative fixed guest-OS overhead per VM instance
+  function draw(n){
+    var w=canvas.width, h=canvas.height; ctx.clearRect(0,0,w,h);
+    var maxOverhead = n*GUEST_OS_MB;
+    var padL=54, padB=28, padT=14, padR=14;
+    var plotW=w-padL-padR, plotH=h-padT-padB;
+    ctx.strokeStyle=C.hair2; ctx.lineWidth=1;
+    for(var g=0;g<=4;g++){ var y=padT+plotH*(1-g/4); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke();
+      ctx.fillStyle=C.soft; ctx.font='10px IBM Plex Mono, monospace'; ctx.textAlign='right';
+      ctx.fillText(Math.round(maxOverhead*g/4)+'MB', padL-8, y+3);
+    }
+    // VM overhead line (linear)
+    ctx.strokeStyle=C.err; ctx.lineWidth=2.5; ctx.beginPath();
+    for(var i=1;i<=n;i++){ var x=padL+plotW*(i/n); var val=i*GUEST_OS_MB; var y=padT+plotH*(1-val/maxOverhead);
+      if(i===1) ctx.moveTo(padL,padT+plotH); ctx.lineTo(x,y); }
+    ctx.stroke();
+    // container overhead line (flat near zero)
+    ctx.strokeStyle=C.infra; ctx.lineWidth=2.5; ctx.beginPath();
+    ctx.moveTo(padL,padT+plotH-2); ctx.lineTo(w-padR,padT+plotH-2); ctx.stroke();
+    ctx.fillStyle=C.err; ctx.font='11px IBM Plex Mono, monospace'; ctx.textAlign='left';
+    ctx.fillText('VM guest-OS overhead', padL+6, padT+14);
+    ctx.fillStyle=C.infra; ctx.fillText('container overhead (~flat)', padL+6, padT+plotH-8);
+  }
+  function update(){
+    var n=parseInt(el('instSlider').value,10);
+    el('instVal').textContent=n;
+    draw(n);
+    el('overheadReadout').innerHTML =
+      '<span>VM total overhead: <b>'+(n*GUEST_OS_MB).toLocaleString()+' MB</b></span>'+
+      '<span>Container total overhead: <b>~0 MB</b></span>';
+  }
+  on('instSlider','input',update); update();
+})();
+
+/* ---------------- s2: self-healing pods ---------------- */
+(function(){
+  var row = el('podRow'); if(!row) return;
+  var pods = [{id:1,state:'healthy'},{id:2,state:'healthy'},{id:3,state:'healthy'}];
+  var restarts = 0;
+  function render(){
+    row.innerHTML='';
+    var healthy=0;
+    pods.forEach(function(p){
+      var d=document.createElement('div');
+      d.className='podchip'+(p.state==='dead'?' dead':p.state==='starting'?' starting':'');
+      d.innerHTML='Pod '+p.id+'<span class="st">'+(p.state==='healthy'?'running':p.state==='starting'?'restarting…':'crashed')+'</span>';
+      if(p.state==='healthy'){ healthy++; d.addEventListener('click',function(){ kill(p); }); }
+      row.appendChild(d);
+    });
+    el('podHealthy').textContent = healthy;
+    el('podRestarts').textContent = restarts;
+  }
+  function kill(p){
+    p.state='dead'; render();
+    setTimeout(function(){ p.state='starting'; render(); }, 500);
+    setTimeout(function(){ p.state='healthy'; restarts++; render(); }, 1500);
+  }
+  render();
+})();
+
+/* ---------------- s3: polyglot tax plot ---------------- */
+(function(){
+  var canvas = el('taxPlot'); if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  function draw(N,L){
+    var w=canvas.width,h=canvas.height; ctx.clearRect(0,0,w,h);
+    var libCount = 7*L, sideCount = 7;
+    var maxV = Math.max(libCount, sideCount, 10);
+    var padL=54,padB=40,padT=16,padR=14, plotW=w-padL-padR, plotH=h-padT-padB;
+    ctx.strokeStyle=C.hair2; for(var g=0;g<=4;g++){ var y=padT+plotH*(1-g/4); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke();
+      ctx.fillStyle=C.soft; ctx.font='10px IBM Plex Mono, monospace'; ctx.textAlign='right'; ctx.fillText(Math.round(maxV*g/4), padL-8, y+3); }
+    var barW = plotW*0.28;
+    function bar(x,val,color,label){
+      var bh = plotH*(val/maxV); var y=padT+plotH-bh;
+      ctx.fillStyle=color; ctx.fillRect(x,y,barW,bh);
+      ctx.fillStyle=C.ink; ctx.font='700 13px Bricolage Grotesque, sans-serif'; ctx.textAlign='center'; ctx.fillText(val, x+barW/2, y-6);
+      ctx.fillStyle=C.soft; ctx.font='11px IBM Plex Mono, monospace'; ctx.fillText(label, x+barW/2, padT+plotH+18);
+    }
+    bar(padL+plotW*0.18, libCount, C.err, 'shared library (7×L)');
+    bar(padL+plotW*0.54, sideCount, C.infra, 'sidecar (flat 7)');
+  }
+  function update(){
+    var N=parseInt(el('taxN').value,10), L=parseInt(el('taxL').value,10);
+    el('tN').textContent=N; el('tL').textContent=L;
+    draw(N,L);
+    el('taxReadout').innerHTML =
+      '<span>Shared-library implementations: <b>'+(7*L)+'</b></span>'+
+      '<span>Sidecar implementations: <b>7</b></span>'+
+      '<span>Services in the fleet: <b>'+N+'</b> (doesn\'t change either total)</span>';
+  }
+  on('taxN','input',update); on('taxL','input',update); update();
+})();
+
+/* ---------------- s4: backend swap ---------------- */
+(function(){
+  var sel = el('backendSelect'); if(!sel) return;
+  var backends = {
+    redis:   {type:'state.redis',      host:'redisHost',    value:'localhost:6379'},
+    postgres:{type:'state.postgresql', host:'connectionString', value:'host=localhost port=5432'},
+    mysql:   {type:'state.mysql',      host:'connectionString', value:'host=localhost port=3306'}
+  };
+  function render(){
+    var b = backends[sel.value];
+    el('backendYaml').innerHTML =
+      'apiVersion: dapr.io/v1alpha1\nkind: Component\nmetadata:\n  <span class="yk">name:</span> <span class="yv">statestore</span>\n'+
+      '<span class="yk">spec:</span>\n  <span class="yk">type:</span> <span class="yv">'+b.type+'</span>\n  '+
+      '<span class="yk">metadata:</span>\n    - <span class="yk">name:</span> <span class="yv">'+b.host+'</span>\n      '+
+      '<span class="yk">value:</span> <span class="yv">'+b.value+'</span>';
+  }
+  sel.addEventListener('change', render); render();
+})();
+
+/* ---------------- s5: retry probability plot ---------------- */
+(function(){
+  var canvas = el('retryPlot'); if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  function draw(p,k){
+    var w=canvas.width,h=canvas.height; ctx.clearRect(0,0,w,h);
+    var padL=44,padB=28,padT=14,padR=14, plotW=w-padL-padR, plotH=h-padT-padB;
+    ctx.strokeStyle=C.hair2; for(var g=0;g<=4;g++){ var y=padT+plotH*(1-g/4); ctx.beginPath(); ctx.moveTo(padL,y); ctx.lineTo(w-padR,y); ctx.stroke();
+      ctx.fillStyle=C.soft; ctx.font='10px IBM Plex Mono, monospace'; ctx.textAlign='right'; ctx.fillText((g*25)+'%', padL-8, y+3); }
+    var maxK=8;
+    ctx.strokeStyle=C.app; ctx.lineWidth=2.5; ctx.beginPath();
+    for(var i=1;i<=maxK;i++){
+      var Psucc = 1-Math.pow(1-p,i);
+      var x=padL+plotW*((i-1)/(maxK-1)); var y=padT+plotH*(1-Psucc);
+      if(i===1) ctx.moveTo(x,y); else ctx.lineTo(x,y);
+    }
+    ctx.stroke();
+    // marker at current k
+    var Pk = 1-Math.pow(1-p,k);
+    var xk = padL+plotW*((k-1)/(maxK-1)); var yk = padT+plotH*(1-Pk);
+    ctx.fillStyle=C.side; ctx.beginPath(); ctx.arc(xk,yk,5,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=C.soft; ctx.font='10px IBM Plex Mono, monospace'; ctx.textAlign='center'; ctx.fillText('attempts →', padL+plotW/2, h-6);
+    return Pk;
+  }
+  function update(){
+    var p = parseInt(el('pSlider').value,10)/100;
+    var k = parseInt(el('kSlider').value,10);
+    el('pVal').textContent = Math.round(p*100)+'%';
+    el('kVal').textContent = k; el('kValR').textContent = k;
+    var Pk = draw(p,k);
+    el('retryBig').textContent = (Pk*100).toFixed(1)+'%';
+    el('retryBig').style.color = Pk>0.95?C.infra:(Pk>0.8?C.amber:C.err);
+  }
+  on('pSlider','input',update); on('kSlider','input',update); update();
+})();
+
+/* ---------------- s6: step player ---------------- */
+(function(){
+  var play = el('stepPlay'); if(!play) return;
+  var steps = [
+    {parts:[], mid:false, cap:'<b>Step 0/5</b> — a request needs to travel from the Employee service to the Department service.'},
+    {parts:['app1'], mid:false, cap:'<b>Step 1/5</b> — Employee\'s business code calls its own local Dapr sidecar, over local HTTP/gRPC. It names the target by <code>app-id</code>, not an IP.'},
+    {parts:['app1','side1'], mid:false, cap:'<b>Step 2/5</b> — the Employee sidecar resolves <code>department-service</code> to a real network address using Kubernetes-native name resolution.'},
+    {parts:['app1','side1'], mid:true, cap:'<b>Step 3/5</b> — the call leaves the Employee sidecar and crosses to the Department sidecar over an encrypted mTLS connection — automatically, with no TLS code in either app.'},
+    {parts:['app1','side1','side2'], mid:true, cap:'<b>Step 4/5</b> — the Department sidecar receives the call. If it fails transiently, Dapr\'s retry policy re-attempts it — still before Department\'s own code runs.'},
+    {parts:['app1','side1','side2','app2'], mid:true, cap:'<b>Step 5/5</b> — Department\'s business code finally runs, handles the request, and the whole hop was traced end to end automatically.'}
+  ];
+  var idx=0, playing=false, timer=null;
+  function render(){
+    var st = steps[idx];
+    ['app1','side1','side2','app2'].forEach(function(p){
+      var node = document.querySelector('[data-part="'+p+'"]');
+      if(node) node.classList.toggle('lit', st.parts.indexOf(p)!==-1);
+    });
+    el('svcEmployee').classList.toggle('lit', st.parts.indexOf('app1')!==-1 || st.parts.indexOf('side1')!==-1);
+    el('svcDepartment').classList.toggle('lit', st.parts.indexOf('side2')!==-1 || st.parts.indexOf('app2')!==-1);
+    el('sceneMid').classList.toggle('lit', !!st.mid);
+    el('stepCaption').innerHTML = st.cap;
+    play.textContent = playing ? '⏸ Pause' : '▶ Play';
+  }
+  function next(){ if(idx<steps.length-1){ idx++; render(); } else { stop(); } }
+  function prev(){ if(idx>0){ idx--; render(); } }
+  function stop(){ playing=false; clearInterval(timer); render(); }
+  on('stepPlay','click',function(){
+    if(playing){ stop(); return; }
+    playing=true; render();
+    timer=setInterval(next, 1400);
+  });
+  on('stepNext','click',function(){ stop(); next(); });
+  on('stepPrev','click',function(){ stop(); prev(); });
+  on('stepReset','click',function(){ stop(); idx=0; render(); });
+  render();
+})();
+
+/* ---------------- s6: URL builder ---------------- */
+(function(){
+  var blockSel = el('urlBlock'); if(!blockSel) return;
+  function render(){
+    var block = blockSel.value, port = el('urlPort').value, target = el('urlTarget').value;
+    var targetWrap = el('urlTargetWrap'), targetLabel = el('urlTargetLabel');
+    var html='';
+    if(block==='invoke'){
+      targetWrap.style.display=''; targetLabel.textContent='Target app-id';
+      html = '<span class="verb">POST</span> http://localhost:'+port+'/v1.0/invoke/<span class="seg">'+target+'</span>/method/<span class="seg">getDepartment</span>';
+    } else if(block==='state'){
+      targetWrap.style.display='none';
+      html = '<span class="verb">POST</span> http://localhost:'+port+'/v1.0/state/<span class="seg">statestore</span>';
+    } else if(block==='pubsub'){
+      targetWrap.style.display='none';
+      html = '<span class="verb">POST</span> http://localhost:'+port+'/v1.0/publish/<span class="seg">pubsub</span>/<span class="seg">employee-events</span>';
+    } else if(block==='secrets'){
+      targetWrap.style.display='none';
+      html = '<span class="verb">GET</span> http://localhost:'+port+'/v1.0/secrets/<span class="seg">vault</span>/<span class="seg">db-password</span>';
+    }
+    el('urlOut').innerHTML = html;
+  }
+  ['urlBlock','urlPort','urlTarget'].forEach(function(id){ on(id,'change',render); });
+  render();
+})();
+
+/* ---------------- narrator module ---------------- */
+(function(){
+  var fab=el('narrFab'), panel=el('narrPanel'); if(!fab) return;
+  var supported = ('speechSynthesis' in window);
+
+  var TITLES={ top:'Introduction', s1:'Why cloud native', s2:'Containers & Kubernetes', s3:'Cross-cutting concerns', s4:'The Dapr approach', s5:'Building blocks', s6:'Running Dapr', s7:'Recap', comments:'Comments' };
+
+  var SCRIPTS={
+    top:"Hey — this one's about the plumbing every distributed app needs and where it should actually live. We'll go from why cloud apps have to behave the way they do, through containers and Kubernetes, and end up at Dapr's sidecar. There's a little live pod diagram up top — that's the whole article in one picture, so keep an eye on it.",
+    s1:"Cloud native is really just six promises: scale, survive failures, breathe with demand, never go down, stay secure, ship independently. Try the nines slider below — going from ninety-nine point nine to ninety-nine point ninety-nine percent sounds tiny, but it cuts your allowed downtime for the whole year by ten times. That's the kind of number that turns into a real engineering argument.",
+    s2:"This section's the history of isolation — bare metal, then virtual machines with a full guest operating system each, then containers sharing one kernel. Drag that instance slider on the overhead chart and watch the VM line climb while the container line barely moves — that gap is exactly why containers won. And go ahead, click one of those pods below — killing it shows you Kubernetes doing its actual job, noticing and replacing it without anyone paging on-call.",
+    s3:"Here's the problem Kubernetes doesn't solve: every service still needs the same seven things — discovery, state, messaging, secrets, bindings, resiliency, observability — and traditionally that means baking a framework library into each one, per language. Play with the services and languages sliders on the tax chart — notice the number of services barely matters, it's the language count that multiplies your pain.",
+    s4:"This is the turn — Dapr pulls those seven things out of your code entirely and runs them as a separate process next to your app, in the same pod. Try swapping the backend in the demo below — Redis, Postgres, MySQL — and watch that only the YAML changes. Your application code, the part that actually matters, never moves.",
+    s5:"Five of these are APIs you call directly, and two — resiliency and observability — just happen underneath everything else because traffic already passes through the sidecar. The retry math here is worth sitting with: even a flaky dependency that only works seventy percent of the time gets you into the high nineties after a handful of automatic retries. Try dragging both sliders and watch how fast that curve bends toward reliable.",
+    s6:"This is where it gets concrete — two real services, Employee and Department, each with its own sidecar, running on Kubernetes. Hit play on the step-through demo and watch a single request actually cross from one service to the other — mTLS, retries, tracing, all without either app writing a line of networking code. The URL builder below shows you the actual shape of a Dapr call if you want to try this yourself later.",
+    s7:"So — quick recap. Cloud native sets the bar, Kubernetes runs the containers but stops at the container boundary, the old shared-library approach taxes you per language, and Dapr's sidecar removes all three problems by moving the plumbing next door instead of inside. If you want to go build this yourself, the docs and quickstarts are linked right below.",
+    comments:"That's the whole walkthrough. If something didn't click, or you want to talk through how this fits your own Kubernetes setup, drop a comment below — I'll read it."
+  };
+
+  var narrationOn=false, currentId=null, lastVisible='top';
+
+  function setSpeakingUI(id,speaking){
+    fab.classList.toggle('speaking', !!speaking);
+    var links=document.querySelectorAll('#rail a');
+    for(var i=0;i<links.length;i++) links[i].classList.toggle('speaking', speaking && links[i].getAttribute('data-sec')===id);
+  }
+  function statusIdle(){ el('narrStatus').textContent = narrationOn ? 'On — narrating as you scroll.' : 'Off — press "Turn on" to begin.'; }
+  function statusSpeaking(id){ el('narrStatus').innerHTML = 'Speaking — <b>'+(TITLES[id]||id)+'</b>'; }
+
+  function getSelectedVoice(){
+    if(!supported) return null;
+    var val=el('narrVoice').value, voices=window.speechSynthesis.getVoices();
+    for(var i=0;i<voices.length;i++){ if(voices[i].name+'|'+voices[i].lang===val) return voices[i]; }
+    return voices[0]||null;
+  }
+  function populateVoices(){
+    if(!supported) return;
+    var voices=window.speechSynthesis.getVoices(); if(!voices.length) return;
+    var sel=el('narrVoice'); if(sel.options.length) return;
+    var en=voices.filter(function(v){return /^en/i.test(v.lang);});
+    var rest=voices.filter(function(v){return !/^en/i.test(v.lang);});
+    (en.length?en.concat(rest):voices).forEach(function(v){
+      var o=document.createElement('option'); o.value=v.name+'|'+v.lang; o.textContent=v.name+' ('+v.lang+')';
+      sel.appendChild(o);
+    });
+  }
+  if(supported){ populateVoices(); window.speechSynthesis.onvoiceschanged=populateVoices; }
+
+  function speak(id){
+    if(!supported) return;
+    var text=SCRIPTS[id]; if(!text) return;
+    window.speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(text);
+    var v=getSelectedVoice(); if(v) u.voice=v;
+    u.rate=0.98; u.pitch=1;
+    u.onstart=function(){ setSpeakingUI(id,true); statusSpeaking(id); el('narrPauseBtn').disabled=false; el('narrPauseBtn').textContent='Pause'; };
+    u.onend=function(){ setSpeakingUI(id,false); statusIdle(); };
+    u.onerror=function(){ setSpeakingUI(id,false); statusIdle(); };
+    window.speechSynthesis.speak(u);
+    currentId=id;
+  }
+
+  function turnOn(){
+    narrationOn=true; el('narrOnOff').textContent='Turn off'; fab.classList.add('active'); statusIdle();
+    if(lastVisible) speak(lastVisible);
+  }
+  function turnOff(){
+    narrationOn=false;
+    if(supported) window.speechSynthesis.cancel();
+    el('narrOnOff').textContent='Turn on'; fab.classList.remove('active');
+    setSpeakingUI(null,false);
+    el('narrPauseBtn').disabled=true; el('narrPauseBtn').textContent='Pause';
+    currentId=null; statusIdle();
+  }
+
+  if(!supported){
+    statusIdle();
+    el('narrStatus').textContent="Voice narration isn't supported in this browser.";
+    el('narrOnOff').disabled=true; el('narrReplay').disabled=true; el('narrPauseBtn').disabled=true; el('narrVoice').disabled=true;
+  } else { statusIdle(); }
+
+  on('narrFab','click',function(){
+    var hidden=panel.hasAttribute('hidden');
+    if(hidden){ panel.removeAttribute('hidden'); fab.setAttribute('aria-expanded','true'); }
+    else { panel.setAttribute('hidden',''); fab.setAttribute('aria-expanded','false'); }
+  });
+  on('narrOnOff','click',function(){ narrationOn?turnOff():turnOn(); });
+  on('narrReplay','click',function(){ var id=currentId||lastVisible; if(id) speak(id); });
+  on('narrPauseBtn','click',function(){
+    if(!supported||!window.speechSynthesis.speaking) return;
+    if(window.speechSynthesis.paused){ window.speechSynthesis.resume(); el('narrPauseBtn').textContent='Pause'; }
+    else { window.speechSynthesis.pause(); el('narrPauseBtn').textContent='Resume'; }
+  });
+
+  var secs=document.querySelectorAll('section.chapter, .hero');
+  if('IntersectionObserver' in window){
+    var nio=new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(e.isIntersecting){
+          lastVisible=e.target.id;
+          if(narrationOn && lastVisible!==currentId) speak(lastVisible);
+        }
+      });
+    },{rootMargin:'-25% 0px -55% 0px'});
+    for(var i=0;i<secs.length;i++) nio.observe(secs[i]);
+  }
+})();
+
+/* =============== likes, comments, and email capture (Supabase-backed) =============== *
+ * SQL SETUP — see references/sql-schema.sql in the groundwork-article skill. Run it once
+ * per Supabase project; every article sharing that project reuses the same three tables,
+ * scoped by CONFIG.ARTICLE_ID. New comments default to approved = false — approve them in
+ * the Supabase Table Editor before they show up for other visitors.
+ * ======================================================================== */
+(function(){
+  var CONFIGURED = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY &&
+    CONFIG.SUPABASE_URL.indexOf('supabase.co')!==-1 && CONFIG.SUPABASE_ANON_KEY.indexOf('YOUR_')!==0);
+  var sb=null;
+
+  function initClient(){
+    if(!CONFIGURED || !window.supabase || sb) return;
+    sb=window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    loadLikeCounts(); loadComments();
+  }
+  window.__sbReady=initClient;
+
+  var LS_EMAIL='groundwork_email', LS_NAME='groundwork_name';
+  function getIdentity(){
+    try{ var e=localStorage.getItem(LS_EMAIL); return e?{email:e,name:localStorage.getItem(LS_NAME)||''}:null; }
+    catch(err){ return null; }
+  }
+  function saveIdentity(email,name){
+    try{ localStorage.setItem(LS_EMAIL,email); localStorage.setItem(LS_NAME,name||''); }catch(err){}
+  }
+
+  var pendingAction=null;
+  function openModal(action){
+    pendingAction=action;
+    el('mErr').textContent='';
+    el('emailModalBg').removeAttribute('hidden');
+    el('mEmail').focus();
+  }
+  function closeModal(){ el('emailModalBg').setAttribute('hidden',''); pendingAction=null; }
+  on('mCancel','click',closeModal);
+  on('mContinue','click',function(){
+    var email=el('mEmail').value.trim(), name=el('mName').value.trim();
+    if(!name){ el('mErr').textContent='Please enter your name.'; return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ el('mErr').textContent='Please enter a valid email address.'; return; }
+    saveIdentity(email,name);
+    if(CONFIGURED && sb){ sb.from('subscribers').insert({email:email, article_id:CONFIG.ARTICLE_ID}).then(function(){}); }
+    var act=pendingAction; closeModal();
+    if(act) act({email:email,name:name});
+  });
+  function requireIdentity(action){
+    var id=getIdentity();
+    if(id) action(id); else openModal(action);
+  }
+
+  /* ---- likes ---- */
+  function renderLikeButtons(){
+    var secs=document.querySelectorAll('section.chapter[id^="s"]');
+    for(var i=0;i<secs.length;i++){
+      var sec=secs[i], h2=sec.querySelector('h2'); if(!h2) continue;
+      var btn=document.createElement('button');
+      btn.type='button'; btn.className='likebtn'; btn.setAttribute('data-sec',sec.id);
+      btn.innerHTML='<span class="hrt">🤍</span><span class="cnt">0</span> like this section';
+      h2.insertAdjacentElement('afterend', btn);
+      (function(btn,secId){
+        btn.addEventListener('click',function(){
+          if(btn.classList.contains('liked')) return;
+          requireIdentity(function(id){ doLike(secId,btn,id); });
+        });
+      })(btn,sec.id);
+    }
+  }
+  function doLike(sectionId,btn,id){
+    btn.classList.add('liked');
+    btn.querySelector('.hrt').textContent='❤';
+    var cnt=btn.querySelector('.cnt');
+    cnt.textContent=(parseInt(cnt.textContent,10)||0)+1;
+    try{ localStorage.setItem('groundwork_liked_'+CONFIG.ARTICLE_ID+'_'+sectionId,'1'); }catch(e){}
+    if(CONFIGURED && sb){
+      sb.from('likes').insert({article_id:CONFIG.ARTICLE_ID, section_id:sectionId, email:id.email}).then(function(res){
+        if(res && res.error && !/duplicate/i.test(res.error.message||'')) console.warn('like failed', res.error);
+      });
+    }
+  }
+  function restoreLikedState(){
+    var btns=document.querySelectorAll('.likebtn');
+    for(var i=0;i<btns.length;i++){
+      var sid=btns[i].getAttribute('data-sec');
+      try{
+        if(localStorage.getItem('groundwork_liked_'+CONFIG.ARTICLE_ID+'_'+sid)==='1'){
+          btns[i].classList.add('liked'); btns[i].querySelector('.hrt').textContent='❤';
+        }
+      }catch(e){}
+    }
+  }
+  function loadLikeCounts(){
+    if(!(CONFIGURED && sb)) return;
+    sb.from('likes').select('section_id').eq('article_id',CONFIG.ARTICLE_ID).then(function(res){
+      if(!res||res.error||!res.data) return;
+      var counts={};
+      for(var i=0;i<res.data.length;i++){ var s=res.data[i].section_id; counts[s]=(counts[s]||0)+1; }
+      var btns=document.querySelectorAll('.likebtn');
+      for(var j=0;j<btns.length;j++){
+        var sid=btns[j].getAttribute('data-sec');
+        btns[j].querySelector('.cnt').textContent = counts[sid]||0;
+      }
+    });
+  }
+
+  /* ---- comments ---- */
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function renderComment(c){
+    var div=document.createElement('div'); div.className='ccard';
+    var name=(c.name && c.name.length) ? escapeHtml(c.name) : 'Anonymous';
+    div.innerHTML='<div class="cname">'+name+'</div><div class="cbody">'+escapeHtml(c.body)+'</div>';
+    return div;
+  }
+  function loadComments(){
+    if(!(CONFIGURED && sb)) return;
+    sb.from('comments').select('name,body,created_at').eq('article_id',CONFIG.ARTICLE_ID).eq('section_id','general').eq('approved',true)
+      .order('created_at',{ascending:false}).then(function(res){
+        if(!res||res.error||!res.data) return;
+        var list=el('cList'); list.innerHTML='';
+        for(var i=0;i<res.data.length;i++) list.appendChild(renderComment(res.data[i]));
+      });
+  }
+  on('cSubmit','click',function(){
+    var body=el('cBody').value.trim();
+    if(!body){ el('cStatus').textContent='Write something first.'; return; }
+    requireIdentity(function(id){
+      el('cStatus').textContent='Posting…';
+      var localC={name:id.name,body:body};
+      if(CONFIGURED && sb){
+        sb.from('comments').insert({article_id:CONFIG.ARTICLE_ID, section_id:'general', email:id.email, name:id.name, body:body}).then(function(res){
+          if(res && res.error){ el('cStatus').textContent='Could not post — please try again.'; return; }
+          el('cList').insertBefore(renderComment(localC), el('cList').firstChild);
+          el('cBody').value='';
+          el('cStatus').textContent='Posted — it\'ll appear for other visitors after a quick review.';
+        });
+      } else {
+        el('cList').insertBefore(renderComment(localC), el('cList').firstChild);
+        el('cBody').value='';
+        el('cStatus').textContent='Posted on this screen only — backend not configured yet, see setup notes above.';
+      }
+    });
+  });
+
+  if(!CONFIGURED){ var note=el('commentsConfigNote'); if(note) note.removeAttribute('hidden'); }
+  renderLikeButtons();
+  restoreLikedState();
+  if(CONFIGURED && window.supabase) initClient();
+})();
+</script>
+
+
+</body>
+</html>

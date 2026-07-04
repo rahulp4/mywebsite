@@ -1,0 +1,1946 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Downhill — Machine Learning from First Principles</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<style>
+:root{
+  --paper:#F3F6F4; --ink:#16262C; --ink-soft:#41565E; --card:#FFFFFF;
+  --hair:#D9E2DC; --hair-2:#E7EEE9;
+  --model:#FF6B35; --model-soft:#FFE3D6;
+  --truth:#1E9E6A; --truth-soft:#DDF2E8;
+  --data:#2D5E8B; --err:#D5484D; --err-soft:#F8E2E2;
+  --amber:#B98214;
+  --r:14px; --shadow:0 1px 2px rgba(22,38,44,.05), 0 8px 24px rgba(22,38,44,.06);
+  --disp:"Bricolage Grotesque", system-ui, sans-serif;
+  --body:"Instrument Sans", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, monospace;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--body); font-size:17px; line-height:1.65;
+  -webkit-font-smoothing:antialiased;
+}
+/* ---------- signature header: the descent bar ---------- */
+#topbar{
+  position:fixed; inset:0 0 auto 0; height:58px; z-index:60;
+  display:flex; align-items:center; gap:16px; padding:0 18px;
+  background:rgba(243,246,244,.88); backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--hair);
+}
+.brand{font-family:var(--disp); font-weight:800; font-size:19px; letter-spacing:-.02em; white-space:nowrap}
+.brand span{color:var(--model)}
+#descent{flex:1; height:44px; min-width:80px}
+#descent .dcurve{fill:none; stroke:var(--hair); stroke-width:2}
+#descent .dtrail{fill:none; stroke:var(--model); stroke-width:2.5; stroke-linecap:round}
+#descent .dball{fill:var(--model); stroke:#fff; stroke-width:2}
+#descent .dmin{fill:var(--truth)}
+.lossbadge{
+  font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); white-space:nowrap;
+  background:var(--card); border:1px solid var(--hair); border-radius:999px; padding:5px 12px;
+}
+.lossbadge b{color:var(--ink); font-weight:600}
+/* ---------- nav rail ---------- */
+#rail{
+  position:fixed; left:0; top:58px; bottom:0; width:220px; z-index:50;
+  padding:26px 14px; overflow-y:auto; border-right:1px solid var(--hair-2);
+  display:flex; flex-direction:column; gap:2px;
+}
+#rail a{
+  display:flex; align-items:baseline; gap:10px; text-decoration:none; color:var(--ink-soft);
+  font-size:14px; font-weight:500; padding:7px 12px; border-radius:9px;
+  border-left:2px solid transparent; transition:background .18s, color .18s;
+}
+#rail a i{font-style:normal; font-family:var(--mono); font-size:11px; color:#9BB0A6; min-width:20px}
+#rail a:hover{background:var(--hair-2); color:var(--ink)}
+#rail a.on{background:var(--card); color:var(--ink); border-left-color:var(--model); box-shadow:var(--shadow)}
+#rail a.on i{color:var(--model)}
+/* ---------- layout ---------- */
+main{margin-left:220px; padding:58px 24px 80px}
+.wrap{max-width:860px; margin:0 auto}
+section.chapter{padding:72px 0 8px; scroll-margin-top:76px; border-bottom:1px dashed var(--hair)}
+section.chapter:last-of-type{border-bottom:none}
+.eyebrow{
+  font-family:var(--mono); font-size:12px; letter-spacing:.14em; text-transform:uppercase;
+  color:var(--model); font-weight:600;
+}
+h2{font-family:var(--disp); font-weight:800; letter-spacing:-.025em; font-size:clamp(26px,3.6vw,36px); line-height:1.12; margin:8px 0 14px}
+h3{font-family:var(--disp); font-weight:700; letter-spacing:-.015em; font-size:19px; margin:0 0 10px}
+p{margin:0 0 14px}
+.prose{color:var(--ink); max-width:70ch}
+.prose strong{font-weight:600}
+.note{color:var(--ink-soft); font-size:15px}
+/* ---------- hero ---------- */
+.hero{padding:96px 0 56px; scroll-margin-top:76px}
+.hero h1{font-family:var(--disp); font-weight:800; letter-spacing:-.03em; font-size:clamp(38px,6vw,62px); line-height:1.04; margin:14px 0 18px}
+.hero h1 em{font-style:normal; color:var(--model)}
+.hero p.lede{font-size:19px; color:var(--ink-soft); max-width:62ch}
+.cta{
+  display:inline-block; margin-top:10px; background:var(--ink); color:#fff; text-decoration:none;
+  font-weight:600; font-size:15px; padding:12px 22px; border-radius:999px;
+}
+.cta:hover{background:#e5561f}
+/* ---------- panels ---------- */
+.panel{
+  background:var(--card); border:1px solid var(--hair); border-radius:var(--r);
+  box-shadow:var(--shadow); padding:22px 22px 20px; margin:22px 0;
+}
+.panel .tag{
+  display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:.12em;
+  text-transform:uppercase; color:var(--ink-soft); background:var(--hair-2);
+  border-radius:999px; padding:3px 10px; margin-bottom:12px;
+}
+.panel.analogy .tag{color:var(--amber); background:#F7EFDA}
+.panel.demo .tag{color:var(--model); background:var(--model-soft)}
+.panel.mathp .tag{color:var(--data); background:#E1EBF4}
+/* equations */
+.eq{display:block; text-align:center; margin:16px 0; font-size:1.12em; overflow-x:auto; padding:4px 0}
+.eq-inline{white-space:nowrap}
+.glossary{display:flex; flex-wrap:wrap; gap:8px; margin-top:14px}
+.chip{
+  font-size:13.5px; background:var(--hair-2); border:1px solid var(--hair); border-radius:999px;
+  padding:4px 12px; color:var(--ink-soft);
+}
+.chip b{font-family:var(--mono); color:var(--ink); font-weight:600; margin-right:4px}
+/* canvases */
+canvas.plot{display:block; width:100%; height:320px; border-radius:10px; background:#FCFDFC; border:1px solid var(--hair-2)}
+canvas.plot.tall{height:400px}
+canvas.plot.short{height:230px}
+/* controls */
+.controls{display:flex; flex-wrap:wrap; gap:14px 22px; align-items:center; margin:14px 0 4px}
+.knob{display:flex; flex-direction:column; gap:4px; min-width:200px; flex:1}
+.knob label{font-size:13.5px; font-weight:600; color:var(--ink-soft); display:flex; justify-content:space-between}
+.knob label b{font-family:var(--mono); color:var(--ink); font-weight:600}
+input[type=range]{width:100%; accent-color:var(--model); height:22px; cursor:pointer}
+.btn{
+  font-family:var(--body); font-weight:600; font-size:14px; cursor:pointer;
+  background:var(--ink); color:#fff; border:none; border-radius:999px; padding:9px 18px;
+  transition:background .15s;
+}
+.btn:hover{background:#0d1a1f}
+.btn.ghost{background:transparent; color:var(--ink); border:1.5px solid var(--hair); }
+.btn.ghost:hover{border-color:var(--ink)}
+.btn.orange{background:var(--model)} .btn.orange:hover{background:#e5561f}
+.btn[disabled]{opacity:.45; cursor:default}
+.btnrow{display:flex; flex-wrap:wrap; gap:10px; margin:12px 0 4px}
+.readout{
+  font-family:var(--mono); font-size:14px; background:var(--hair-2); border-radius:10px;
+  padding:10px 14px; margin-top:12px; overflow-x:auto; white-space:nowrap;
+}
+.big-metric{display:flex; align-items:baseline; gap:10px; margin-top:12px}
+.big-metric .v{font-family:var(--mono); font-weight:600; font-size:34px; letter-spacing:-.02em}
+.big-metric .l{font-size:14px; color:var(--ink-soft)}
+.good .v{color:var(--truth)} .bad .v{color:var(--err)}
+/* tables */
+table.t{width:100%; border-collapse:collapse; font-size:14px; margin-top:12px}
+table.t th{font-family:var(--mono); font-size:11.5px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); text-align:right; padding:6px 10px; border-bottom:1.5px solid var(--hair)}
+table.t td{font-family:var(--mono); text-align:right; padding:6px 10px; border-bottom:1px solid var(--hair-2)}
+table.t th:first-child, table.t td:first-child{text-align:left}
+tr.hl td{background:var(--model-soft)}
+/* admissions bars */
+.bars{display:flex; flex-direction:column; gap:14px; margin-top:14px}
+.barrow{display:grid; grid-template-columns:96px 1fr 64px; align-items:center; gap:12px}
+.barrow .who{font-weight:600; font-size:14.5px}
+.bartrack{background:var(--hair-2); border-radius:999px; height:26px; overflow:hidden}
+.barfill{height:100%; border-radius:999px; width:0%; transition:width .8s cubic-bezier(.22,.9,.3,1); display:flex; align-items:center; justify-content:flex-end; padding-right:10px; color:#fff; font-family:var(--mono); font-size:12px; font-weight:600}
+.barfill.a{background:var(--data)} .barfill.b{background:var(--truth)}
+.winner{font-family:var(--mono); font-size:13px; font-weight:600}
+.breakdown{font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); margin-top:10px}
+/* chain rule boxes */
+.chain{display:flex; align-items:center; justify-content:center; gap:0; margin:18px 0 6px; font-family:var(--mono); font-size:15px; flex-wrap:wrap}
+.cbox{border:2px solid var(--hair); border-radius:12px; padding:10px 16px; transition:border-color .4s, background .4s}
+.cbox .cbox{margin:0 8px; padding:6px 12px}
+.cbox.glow-out{border-color:var(--model); background:var(--model-soft)}
+.cbox.glow-in{border-color:var(--data); background:#E1EBF4}
+.chain-cap{text-align:center; font-size:13.5px; color:var(--ink-soft); min-height:22px; font-weight:600}
+/* gradient arrows */
+.garrow{display:grid; grid-template-columns:120px 1fr 130px; align-items:center; gap:12px; margin-top:10px}
+.garrow .gl{font-family:var(--mono); font-size:13.5px}
+.gtrack{position:relative; height:14px; background:var(--hair-2); border-radius:999px}
+.gfill{position:absolute; top:2px; bottom:2px; left:50%; border-radius:999px; background:var(--model); transition:all .2s}
+.gdir{font-size:13px; color:var(--ink-soft); font-weight:600}
+/* lr trio */
+.trio{display:grid; grid-template-columns:repeat(3,1fr); gap:14px; margin-top:14px}
+.trio .cell{background:#FCFDFC; border:1px solid var(--hair-2); border-radius:10px; padding:12px}
+.trio h4{margin:0 0 6px; font-family:var(--disp); font-size:15.5px; font-weight:700}
+.trio h4 code{font-family:var(--mono); font-weight:600; color:var(--model); font-size:13px}
+.trio canvas{width:100%; height:150px; display:block}
+.status{font-family:var(--mono); font-size:12px; margin-top:8px; min-height:18px; color:var(--ink-soft)}
+.status.ok{color:var(--truth)} .status.no{color:var(--err)}
+/* loop diagram */
+.loopwrap{display:flex; justify-content:center; margin-top:8px}
+#loopsvg{width:min(420px,100%); height:auto}
+#loopsvg .node rect{fill:var(--card); stroke:var(--hair); stroke-width:1.5; rx:12}
+#loopsvg .node text{font-family:var(--disp); font-weight:700; font-size:14px; fill:var(--ink)}
+#loopsvg .node .sub{font-family:var(--body); font-weight:400; font-size:10.5px; fill:var(--ink-soft)}
+#loopsvg .node.lit rect{stroke:var(--model); stroke-width:2.5; fill:var(--model-soft)}
+#loopsvg .arrow{fill:none; stroke:#9BB0A6; stroke-width:2; marker-end:url(#ah)}
+/* trainer */
+.trainhead{display:flex; flex-wrap:wrap; gap:10px 26px; align-items:baseline; font-family:var(--mono); font-size:14px; margin-top:12px}
+.trainhead b{font-size:22px; font-weight:600}
+.trainhead .k{color:var(--ink-soft); font-size:12px; letter-spacing:.08em; text-transform:uppercase}
+.duo{display:grid; grid-template-columns:3fr 2fr; gap:14px; margin-top:14px}
+.duo canvas{height:280px}
+select{font-family:var(--body); font-size:14px; padding:8px 12px; border-radius:999px; border:1.5px solid var(--hair); background:var(--card); cursor:pointer}
+details.arith{margin-top:14px; border:1px solid var(--hair-2); border-radius:10px; background:#FCFDFC}
+details.arith summary{cursor:pointer; padding:10px 14px; font-weight:600; font-size:14px; color:var(--ink-soft)}
+details.arith pre{margin:0; padding:4px 16px 14px; font-family:var(--mono); font-size:13px; line-height:1.7; overflow-x:auto; color:var(--ink)}
+.logbox{max-height:240px; overflow-y:auto; margin-top:6px; border:1px solid var(--hair-2); border-radius:10px}
+/* bowl */
+.toggle{display:inline-flex; border:1.5px solid var(--hair); border-radius:999px; overflow:hidden}
+.toggle button{border:none; background:transparent; font-family:var(--body); font-weight:600; font-size:13.5px; padding:8px 16px; cursor:pointer; color:var(--ink-soft)}
+.toggle button.on{background:var(--ink); color:#fff}
+/* nn svg */
+#nnsvg{width:min(380px,100%); height:auto; display:block; margin:10px auto 0}
+#nnsvg line{stroke:#9BB0A6; stroke-width:1.6}
+#nnsvg circle{fill:var(--card); stroke:var(--data); stroke-width:2}
+#nnsvg line.pulse{stroke:var(--model); stroke-width:2; stroke-dasharray:6 10; animation:dashmove 1.6s linear infinite}
+@keyframes dashmove{to{stroke-dashoffset:-32}}
+/* summary */
+.formulas{display:grid; gap:12px; margin-top:14px}
+.fcard{display:grid; grid-template-columns:170px 1fr; gap:16px; align-items:center; background:#FCFDFC; border:1px solid var(--hair-2); border-radius:10px; padding:12px 16px}
+.fcard .fn{font-family:var(--disp); font-weight:700; font-size:15px}
+.pits{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px}
+.pit{background:#FCFDFC; border:1px solid var(--hair-2); border-radius:10px; padding:14px 16px}
+.pit h4{margin:0 0 6px; font-family:var(--disp); font-size:15.5px; font-weight:700}
+.pit p{font-size:14px; color:var(--ink-soft); margin:0}
+.pit svg{display:block; width:100%; height:54px; margin-bottom:8px}
+.pit svg path{fill:none; stroke-width:2.5; stroke-linecap:round}
+footer{padding:56px 0 20px; color:var(--ink-soft); font-size:14px}
+/* reveal on scroll */
+.reveal{opacity:0; transform:translateY(22px); transition:opacity .7s ease, transform .7s ease}
+.reveal.in{opacity:1; transform:none}
+@media (prefers-reduced-motion:reduce){
+  .reveal{opacity:1; transform:none; transition:none}
+  .barfill{transition:none}
+}
+/* ---------- voice narrator ---------- */
+#narrator{position:fixed; right:20px; bottom:20px; z-index:70; display:flex; flex-direction:column; align-items:flex-end; gap:10px}
+.narr-fab{
+  width:52px; height:52px; border-radius:50%; border:none; cursor:pointer;
+  background:var(--ink); color:#fff; font-size:20px; box-shadow:var(--shadow);
+  display:flex; align-items:center; justify-content:center; transition:background .15s, transform .15s;
+}
+.narr-fab:hover{background:#0d1a1f}
+.narr-fab.active{background:var(--model)}
+.narr-fab.speaking{animation:narrpulse 1.4s ease-in-out infinite}
+@keyframes narrpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,107,53,.45)}50%{box-shadow:0 0 0 10px rgba(255,107,53,0)}}
+@media (prefers-reduced-motion:reduce){ .narr-fab.speaking{animation:none} }
+.narr-panel{
+  width:270px; background:var(--card); border:1px solid var(--hair); border-radius:var(--r);
+  box-shadow:var(--shadow); padding:16px; font-size:13.5px;
+}
+.narr-panel h4{margin:0 0 10px; font-family:var(--disp); font-weight:700; font-size:14.5px}
+.narr-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px}
+.narr-row:last-of-type{margin-bottom:0}
+.narr-row select{flex:1; font-size:13px; padding:6px 8px; border-radius:8px}
+.narr-btnrow{display:flex; gap:8px; margin-top:2px}
+.btn.small{padding:6px 12px; font-size:12.5px}
+.narr-status{margin-top:10px; padding-top:10px; border-top:1px solid var(--hair-2); color:var(--ink-soft); font-family:var(--mono); font-size:11.5px; min-height:16px}
+.narr-status b{color:var(--model); font-weight:600}
+#rail a .dot{display:none; width:6px; height:6px; border-radius:50%; background:var(--model); margin-left:auto}
+#rail a.speaking .dot{display:inline-block; animation:narrpulse2 1.2s ease-in-out infinite}
+@keyframes narrpulse2{0%,100%{opacity:1}50%{opacity:.25}}
+@media (max-width:920px){
+  #narrator{right:12px; bottom:12px}
+  .narr-panel{width:230px}
+}
+/* ---------- likes ---------- */
+.likebtn{
+  display:inline-flex; align-items:center; gap:8px; border:1.5px solid var(--hair); background:var(--card);
+  border-radius:999px; padding:7px 16px; font-family:var(--body); font-size:13.5px; font-weight:600;
+  color:var(--ink-soft); cursor:pointer; margin:2px 0 20px; transition:border-color .15s, color .15s, background .15s;
+}
+.likebtn:hover{border-color:var(--model)}
+.likebtn.liked{border-color:var(--model); color:var(--model); background:var(--model-soft); cursor:default}
+.likebtn .hrt{font-size:15px}
+/* ---------- comments ---------- */
+.ctextarea{width:100%; font-family:var(--body); font-size:14.5px; padding:11px 14px; border-radius:10px; border:1.5px solid var(--hair); resize:vertical; background:#FCFDFC}
+.ctextarea:focus{outline:none; border-color:var(--model)}
+.clist{display:flex; flex-direction:column; gap:12px; margin-top:18px}
+.ccard{border:1px solid var(--hair-2); border-radius:10px; padding:12px 15px; background:#FCFDFC}
+.ccard .cname{font-weight:600; font-size:13.5px}
+.ccard .cbody{font-size:14px; margin-top:4px; white-space:pre-wrap; color:var(--ink)}
+/* ---------- email-capture modal ---------- */
+.modalbg{position:fixed; inset:0; background:rgba(22,38,44,.45); z-index:90; display:flex; align-items:center; justify-content:center; padding:20px}
+.modalbg[hidden]{display:none}
+.modalbox{background:var(--card); border-radius:var(--r); padding:26px; width:min(370px,100%); box-shadow:var(--shadow)}
+.modalbox h4{margin:0 0 6px; font-family:var(--disp); font-weight:700; font-size:17px}
+.modalbox input{width:100%; font-family:var(--body); font-size:14.5px; padding:10px 13px; border-radius:9px; border:1.5px solid var(--hair); margin-top:10px; background:#FCFDFC}
+.modalbox input:focus{outline:none; border-color:var(--model)}
+/* mobile */
+@media (max-width:920px){
+  #rail{
+    top:58px; bottom:auto; left:0; right:0; width:auto; height:48px;
+    flex-direction:row; align-items:center; gap:6px; padding:0 12px;
+    overflow-x:auto; overflow-y:hidden; border-right:none; border-bottom:1px solid var(--hair-2);
+    background:rgba(243,246,244,.92); backdrop-filter:blur(10px);
+  }
+  #rail a{white-space:nowrap; border-left:none; border-bottom:2px solid transparent; border-radius:8px 8px 0 0; padding:6px 10px}
+  #rail a.on{border-left:none; border-bottom-color:var(--model); box-shadow:none}
+  main{margin-left:0; padding-top:106px}
+  section.chapter{scroll-margin-top:122px}
+  .hero{scroll-margin-top:122px; padding-top:60px}
+  .duo{grid-template-columns:1fr}
+  .trio{grid-template-columns:1fr}
+  .pits{grid-template-columns:1fr}
+  .fcard{grid-template-columns:1fr; gap:4px}
+  .barrow{grid-template-columns:70px 1fr 58px}
+  canvas.plot{height:260px}
+  .lossbadge{display:none}
+}
+</style>
+</head>
+<body>
+
+<header id="topbar" aria-hidden="true">
+  <div class="brand">Downhill<span>.</span></div>
+  <svg id="descent" viewBox="0 0 300 44" preserveAspectRatio="none">
+    <path class="dcurve" id="dcurve" d=""></path>
+    <path class="dtrail" id="dtrail" d=""></path>
+    <circle class="dmin" cx="292" cy="38" r="3"></circle>
+    <circle class="dball" id="dball" cx="8" cy="6" r="5"></circle>
+  </svg>
+  <div class="lossbadge">loss ≈ <b id="lossnow">27.67</b></div>
+</header>
+
+<nav id="rail" aria-label="Chapter sections">
+  <a href="#s1" data-sec="s1"><i>01</i>What ML is<span class="dot"></span></a>
+  <a href="#s2" data-sec="s2"><i>02</i>The model<span class="dot"></span></a>
+  <a href="#s3" data-sec="s3"><i>03</i>The loss<span class="dot"></span></a>
+  <a href="#s4" data-sec="s4"><i>04</i>Derivatives<span class="dot"></span></a>
+  <a href="#s5" data-sec="s5"><i>05</i>The gradient<span class="dot"></span></a>
+  <a href="#s6" data-sec="s6"><i>06</i>Gradient descent<span class="dot"></span></a>
+  <a href="#s7" data-sec="s7"><i>07</i>Training loop<span class="dot"></span></a>
+  <a href="#s8" data-sec="s8"><i>08</i>Worked example<span class="dot"></span></a>
+  <a href="#s9" data-sec="s9"><i>09</i>The bowl<span class="dot"></span></a>
+  <a href="#s10" data-sec="s10"><i>10</i>Generalizing<span class="dot"></span></a>
+  <a href="#s11" data-sec="s11"><i>11</i>Summary<span class="dot"></span></a>
+</nav>
+
+<div id="narrator">
+  <div class="narr-panel" id="narrPanel" hidden>
+    <h4>Voice narration</h4>
+    <div class="narr-row">
+      <span>Narrate as I scroll</span>
+      <button id="narrOnOff" class="btn ghost small">Turn on</button>
+    </div>
+    <div class="narr-row">
+      <select id="narrVoice" aria-label="Choose a voice"></select>
+    </div>
+    <div class="narr-btnrow">
+      <button id="narrReplay" class="btn ghost small">Replay section</button>
+      <button id="narrPauseBtn" class="btn ghost small" disabled>Pause</button>
+    </div>
+    <div class="narr-status" id="narrStatus">Off — press "Turn on" to begin.</div>
+  </div>
+  <button id="narrFab" class="narr-fab" aria-label="Open voice narration controls" aria-expanded="false" title="Voice narration">🔊</button>
+</div>
+
+<div id="emailModalBg" class="modalbg" hidden>
+  <div class="modalbox">
+    <h4>One quick thing</h4>
+    <p class="note">Add your email so we know who's liking and commenting. We won't spam you, and this browser won't ask again.</p>
+    <input type="text" id="mName" placeholder="Name">
+    <input type="email" id="mEmail" placeholder="you@example.com">
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn orange" id="mContinue">Continue</button>
+      <button class="btn ghost" id="mCancel">Cancel</button>
+    </div>
+    <div class="note" id="mErr" style="color:var(--err); margin-top:8px"></div>
+  </div>
+</div>
+
+<main>
+<div class="wrap">
+
+<!-- ============ HERO ============ -->
+<section class="hero" id="top">
+  <span class="eyebrow">An interactive chapter · Machine Learning from first principles</span>
+  <h1>A machine learns the way you find the bottom of a hill: <em>one small step downhill</em> at a time.</h1>
+  <p class="lede">No math background needed. Using one tiny example — predicting a house's price from its size — you'll watch a straight line teach itself to fit data. Every equation is explained in plain words, and everything that can move, moves. Watch the loss counter in the top bar: it falls to zero as you make your way down the page.</p>
+  <a class="cta" href="#s1">Start walking ↓</a>
+</section>
+
+<!-- ============ SECTION 1 ============ -->
+<section id="s1" class="chapter reveal">
+  <span class="eyebrow">Section 01</span>
+  <h2>What is Machine Learning, really?</h2>
+  <div class="prose">
+    <p>Traditional programming means a human writes explicit rules: <em>"if this, then that."</em> Machine Learning flips that around. Instead of writing the rules ourselves, we show the computer many examples of inputs and correct outputs, and let it <strong>discover the rule</strong> — a mathematical function — that connects them. Once learned, that function can predict answers for brand-new inputs it has never seen.</p>
+    <p>A spam filter isn't told <em>"the phrase 'free money' means spam"</em> (spammers adapt in a week). It's shown thousands of labeled emails and learns which patterns correlate with spam. Handwriting readers aren't given a rule for every possible "7" — they see thousands of examples. In every case the common thread is the same: <strong>we don't know the rule ourselves, but we have examples of it in action</strong> — so we let the data reveal the rule.</p>
+    <p class="note">This chapter is about <strong>supervised learning</strong>: we have both inputs and correct answers. (Two siblings exist — <em>unsupervised</em> learning finds structure without answers, and <em>reinforcement</em> learning learns from rewards — but they wait for another chapter.)</p>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">The idea in symbols</span>
+    <span class="eq" data-tex="f(x) \approx y" data-disp="1">f(x) ≈ y</span>
+    <p class="note">We're hunting for a function <span class="eq-inline" data-tex="f">f</span> that turns an input into (approximately) the right output. The wavy "≈" matters: we rarely find a rule that's perfectly right — we find one that's <em>close enough on average</em>.</p>
+    <div class="glossary">
+      <span class="chip"><b>x</b> the input — a fact we know (house size)</span>
+      <span class="chip"><b>y</b> the true answer (the actual sale price)</span>
+      <span class="chip"><b>f</b> the rule the machine must discover</span>
+      <span class="chip"><b>≈</b> "approximately equals" — close, not perfect</span>
+    </div>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">See it move · finding f is drawing a line</span>
+    <h3>Many candidate rules, one best fit</h3>
+    <p class="note">Here are our three houses (sizes 1, 2, 3 — in hundreds of square feet — selling for 3, 5, 7 — in $10,000s). Each gray line is a different <em>candidate</em> rule. The machine's whole job is to find the one line that fits the dots best — automatically, instead of a human guessing by eye.</p>
+    <canvas id="cv1" class="plot"></canvas>
+    <div class="readout" id="cand-label">Trying candidate rules…</div>
+  </div>
+</section>
+
+<!-- ============ SECTION 2 ============ -->
+<section id="s2" class="chapter reveal">
+  <span class="eyebrow">Section 02</span>
+  <h2>The model: a line with two knobs</h2>
+  <div class="prose">
+    <p>Our simplest possible rule assumes price grows in a straight line with size: a bigger house costs proportionally more, on top of some fixed base cost. A straight line has exactly <strong>two knobs</strong> you can turn: how <em>steep</em> it is, and where it <em>starts</em>. Learning, at its core, is nothing more than tuning these two knobs until the line fits the data well.</p>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">The model equation</span>
+    <span class="eq" data-tex="\hat{y} = w\,x + b" data-disp="1">ŷ = w·x + b</span>
+    <div class="glossary">
+      <span class="chip"><b>ŷ</b> "y-hat" — the model's <em>predicted</em> answer (the hat means "our guess", not the true value)</span>
+      <span class="chip"><b>x</b> the input (house size)</span>
+      <span class="chip"><b>w</b> the <em>weight</em> — knob #1, the slope: how much price rises per unit of size</span>
+      <span class="chip"><b>b</b> the <em>bias</em> — knob #2, the starting height: the base price when size is zero</span>
+    </div>
+    <p class="note" style="margin-top:12px">If <b>w</b> is large, price climbs steeply with size. If it's near zero, size barely matters. And <b>b</b> slides the whole line up or down without changing its tilt. Just two numbers completely determine the line — so <strong>training a model is nothing more than searching for the best pair of numbers.</strong></p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Interactive · turn the two knobs yourself</span>
+    <h3>Steer the line over the houses</h3>
+    <div class="controls">
+      <div class="knob">
+        <label>weight w — the slope <b id="w2v">1.0</b></label>
+        <input type="range" id="w2" min="-1" max="4" step="0.1" value="1">
+      </div>
+      <div class="knob">
+        <label>bias b — the starting height <b id="b2v">0.5</b></label>
+        <input type="range" id="b2" min="-2" max="4" step="0.1" value="0.5">
+      </div>
+    </div>
+    <canvas id="cv2" class="plot"></canvas>
+    <div class="readout" id="eq2">ŷ = 1.0·x + 0.5</div>
+    <div class="btnrow">
+      <button class="btn ghost" data-preset2="0.5,0">Try w=0.5, b=0</button>
+      <button class="btn ghost" data-preset2="3,-1">Try w=3, b=−1</button>
+      <button class="btn ghost" data-preset2="2,1">Try w=2, b=1 (spoiler: the winner)</button>
+    </div>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">Real-life analogy · what a "weight" really means</span>
+    <h3>Two colleges, same students, opposite verdicts</h3>
+    <p class="note">"Weight" isn't jargon — it means what it means in everyday life: <em>how much a factor counts toward an outcome</em>. Imagine a college admissions score built from three inputs every applicant has — GPA, a test score, and extracurriculars (each out of 10):</p>
+    <span class="eq" data-tex="\text{Score} = w_1\!\cdot\!\text{GPA} + w_2\!\cdot\!\text{Test} + w_3\!\cdot\!\text{Extracurricular} + b" data-disp="1">Score = w₁·GPA + w₂·Test + w₃·Extracurricular + b</span>
+    <p class="note">Student A has GPA 9.5, Test 9.0, Extracurricular 3.0. Student B has GPA 7.0, Test 7.0, Extracurricular 9.5. <strong>The students never change.</strong> Only the weights do — watch the ranking flip:</p>
+    <div class="btnrow">
+      <button class="btn" id="schemeA">Academic-focused college <span style="font-weight:400">(w = 0.6, 0.35, 0.05)</span></button>
+      <button class="btn ghost" id="schemeB">Holistic college <span style="font-weight:400">(w = 0.3, 0.2, 0.5)</span></button>
+    </div>
+    <div class="bars">
+      <div class="barrow"><span class="who">Student A</span><div class="bartrack"><div class="barfill a" id="barA"></div></div><span class="winner" id="winA"></span></div>
+      <div class="barrow"><span class="who">Student B</span><div class="bartrack"><div class="barfill b" id="barB"></div></div><span class="winner" id="winB"></span></div>
+    </div>
+    <div class="breakdown" id="breakdown"></div>
+    <p class="note" style="margin-top:12px">That's the entire point of a weight: <strong>how much influence one input has on the final answer, relative to the others.</strong> A college committee picks its weights by intuition. An ML model lets <em>gradient descent search for</em> the weights that make predictions match reality — judged by the loss function we meet next. (Real houses use the same trick with many features — size, bedrooms, location — each with its own weight: <span class="eq-inline" data-tex="\hat{y}=w_1x_1+w_2x_2+\cdots+w_nx_n+b">ŷ = w₁x₁ + w₂x₂ + … + wₙxₙ + b</span>.)</p>
+  </div>
+</section>
+
+<!-- ============ SECTION 3 ============ -->
+<section id="s3" class="chapter reveal">
+  <span class="eyebrow">Section 03</span>
+  <h2>How do we know a model is good? The loss function</h2>
+  <div class="prose">
+    <p>Once we have a line — any line, even a terrible guess — we need a way to <strong>measure how wrong it is</strong>. For each house we compare the model's prediction to the actual price; the difference is that house's <em>error</em>. We then want one single number summarizing how wrong the model is across <em>all</em> houses at once. Smaller is better. That number is called the <strong>loss</strong>.</p>
+    <p><strong>Why square each error?</strong> Two reasons. First, a raw error can be positive or negative — if we just averaged them, a +10 miss and a −10 miss would cancel to zero, falsely claiming a perfect model. Squaring makes every error positive, so mistakes can never hide each other. Second, squaring punishes <em>big</em> misses much more than small ones — being off by 4 costs 16, being off by 1 costs only 1. Being very wrong <em>should</em> count for more than being slightly wrong.</p>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">Real-life analogy · why squaring is fair</span>
+    <h3>A dartboard where big misses hurt extra</h3>
+    <p class="note">Imagine scoring darts by the <em>area of a square</em> drawn on your miss distance. Miss by 1 cm — a tiny 1 cm² square, barely a scratch. Miss by 5 cm — a 25 cm² square, a real penalty. Under this scoring, one wild throw costs more than many small wobbles, so the safest strategy is to keep <em>every</em> throw reasonably close. That's exactly the behavior we want from our line: no single house left badly mispriced. In the demo below, each error is drawn as a literal square — watch how the biggest miss dominates the picture.</p>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">The loss equation · Mean Squared Error</span>
+    <span class="eq" data-tex="L(w, b) = \frac{1}{n}\sum_{i=1}^{n}\left(\hat{y}_i - y_i\right)^2" data-disp="1">L(w,b) = (1/n) Σ (ŷᵢ − yᵢ)²</span>
+    <div class="glossary">
+      <span class="chip"><b>L</b> the loss — one number for "how wrong overall" (smaller = better)</span>
+      <span class="chip"><b>Σ</b> "sigma" — just means "add these up, one per data point"</span>
+      <span class="chip"><b>n</b> how many data points we have (here, 3 houses)</span>
+      <span class="chip"><b>ŷᵢ − yᵢ</b> the error on house number i: prediction minus truth</span>
+      <span class="chip"><b>1/n</b> divide by the count — i.e. take the average</span>
+    </div>
+    <p class="note" style="margin-top:12px">In words: <em>"for each house, take (prediction − truth), square it, then average the squares."</em> We write L as a function of <b>w</b> and <b>b</b> because those knobs are the only things we control — the data is fixed.</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Interactive · errors as literal squares, loss computed live</span>
+    <h3>The bad line vs. the good line</h3>
+    <p class="note">Same two knobs as before — but now every prediction miss is drawn as a red stick (the error) with its square attached (the penalty). Start on the chapter's <em>bad line</em> (w = 0.5, b = 0, loss 17.5), then press the good line and watch the penalty collapse to zero.</p>
+    <div class="controls">
+      <div class="knob">
+        <label>weight w <b id="w3v">0.5</b></label>
+        <input type="range" id="w3" min="-1" max="4" step="0.1" value="0.5">
+      </div>
+      <div class="knob">
+        <label>bias b <b id="b3v">0.0</b></label>
+        <input type="range" id="b3" min="-2" max="4" step="0.1" value="0">
+      </div>
+    </div>
+    <canvas id="cv3" class="plot tall"></canvas>
+    <div class="big-metric" id="msebox"><span class="v" id="mse3">17.50</span><span class="l">loss L(w, b) — mean of the squared errors</span></div>
+    <table class="t">
+      <thead><tr><th>house</th><th>size x</th><th>true price y</th><th>predicted ŷ</th><th>error ŷ−y</th><th>squared</th></tr></thead>
+      <tbody id="ptable"></tbody>
+    </table>
+    <div class="readout" id="msemath"></div>
+    <div class="btnrow">
+      <button class="btn" data-preset3="0.5,0">The chapter's bad line (w=0.5, b=0)</button>
+      <button class="btn orange" data-preset3="2,1">The good line (w=2, b=1)</button>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 4 ============ -->
+<section id="s4" class="chapter reveal">
+  <span class="eyebrow">Section 04</span>
+  <h2>Derivatives: which way is downhill?</h2>
+  <div class="prose">
+    <p>Plot the loss against every possible pair of knob settings and you get a <strong>bowl-shaped surface</strong> (you'll see it in Section 9). The best model lives at the bottom of the bowl. So the whole problem becomes: <em>how do you find the bottom of a bowl you can't see all at once?</em></p>
+    <p>A <strong>derivative</strong> answers exactly one question: at the spot where you're standing, how steeply is the ground tilting, and in which direction? Slope pointing up to the right? Then downhill is to the left. Slope of zero? You're standing on flat ground — possibly the very bottom.</p>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">The chapter's analogy · the blindfolded hiker</span>
+    <h3>Feeling for the slope with your feet</h3>
+    <p class="note">Imagine standing somewhere on that bowl, blindfolded, asked to walk to the bottom. You can't see the shape — but you <em>can</em> feel which way the ground slopes under your feet. Take a small step downhill, feel again, step again. Repeat, and you'll reach the bottom. A derivative is that feeling-with-your-feet, turned into a number. Try it below: read the slope, then step downhill.</p>
+    <div class="controls">
+      <div class="knob" style="max-width:340px">
+        <label>where the hiker stands, x <b id="x4v">2.40</b></label>
+        <input type="range" id="x4" min="-3" max="3" step="0.05" value="2.4">
+      </div>
+      <button class="btn orange" id="stepdown">Take a step downhill</button>
+      <button class="btn ghost" id="walkdown">Walk to the bottom</button>
+    </div>
+    <canvas id="cv4" class="plot"></canvas>
+    <div class="readout" id="slope4"></div>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">The definition, and the only two rules we need</span>
+    <span class="eq" data-tex="f'(x) = \lim_{h \to 0}\frac{f(x+h) - f(x)}{h}" data-disp="1">f′(x) = lim (h→0) [f(x+h) − f(x)] / h</span>
+    <div class="glossary">
+      <span class="chip"><b>f′(x)</b> "f prime" — the slope of f at the exact point x</span>
+      <span class="chip"><b>h</b> a tiny nudge to the input, shrinking toward zero</span>
+      <span class="chip"><b>lim</b> "in the limit" — what the value settles to as h vanishes</span>
+    </div>
+    <p class="note" style="margin-top:12px">In words: <em>"nudge the input a hair, see how much the output moves, divide — that ratio, for an infinitely small nudge, is the slope at that exact spot."</em> Happily, we only ever need two ready-made rules:</p>
+    <p><strong>1 · The power rule.</strong> For <span class="eq-inline" data-tex="f(x)=x^n">f(x) = xⁿ</span>, the slope is <span class="eq-inline" data-tex="f'(x)=n\,x^{n-1}">f′(x) = n·xⁿ⁻¹</span>. So for <span class="eq-inline" data-tex="f(x)=x^2">f(x) = x²</span> — the hill above — the slope is <span class="eq-inline" data-tex="f'(x)=2x">f′(x) = 2x</span>. That's why the readout above always shows exactly twice the hiker's position.</p>
+    <p><strong>2 · The chain rule.</strong> When one function sits <em>inside</em> another, <span class="eq-inline" data-tex="f(x)=g(h(x))">f(x) = g(h(x))</span>, the slope is <span class="eq-inline" data-tex="f'(x)=g'(h(x))\cdot h'(x)">f′(x) = g′(h(x)) · h′(x)</span> — differentiate the <em>outer</em> function first, then multiply by the derivative of the <em>inner</em> one. Like peeling an onion: outside layer, then inside layer, multiply.</p>
+    <div class="chain" aria-hidden="true">
+      <div class="cbox" id="cout">(&nbsp;<div class="cbox" id="cin" style="display:inline-block">w·x + b − y</div>&nbsp;)²</div>
+    </div>
+    <div class="chain-cap" id="chaincap">Our loss is exactly this shape: a square (outer) wrapped around the line (inner).</div>
+    <p class="note">We'll use the chain rule in the very next section — because our loss <span class="eq-inline" data-tex="(\hat{y}-y)^2">(ŷ − y)²</span> is a square (outer function) wrapped around the line <span class="eq-inline" data-tex="\hat{y}=wx+b">ŷ = wx + b</span> (inner function, which contains the knob w we care about).</p>
+  </div>
+</section>
+
+<!-- ============ SECTION 5 ============ -->
+<section id="s5" class="chapter reveal">
+  <span class="eyebrow">Section 05</span>
+  <h2>The gradient: a slope for each knob</h2>
+  <div class="prose">
+    <p>We have two knobs, so we ask the slope question twice: <em>if I nudge <b>w</b> a hair, does the loss go up or down, and how fast?</em> And the same for <b>b</b>. The two answers together are called the <strong>gradient</strong> — a pair of numbers pointing in the direction where loss climbs <em>fastest</em>. Since we want loss to <em>fall</em>, we'll move exactly the opposite way.</p>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">Deriving both slopes with the chain rule</span>
+    <p class="note">Take the loss for one house, <span class="eq-inline" data-tex="(\hat{y}-y)^2">(ŷ − y)²</span> where <span class="eq-inline" data-tex="\hat{y}=wx+b">ŷ = wx + b</span>. Chain rule: outer square first (power rule gives <span class="eq-inline" data-tex="2(\hat{y}-y)">2(ŷ−y)</span>), then multiply by the inner function's slope with respect to w — which is just <b>x</b>, since in <span class="eq-inline" data-tex="wx+b-y">wx + b − y</span> only the wx part moves when w moves:</p>
+    <span class="eq" data-tex="\frac{\partial}{\partial w}(\hat{y}-y)^2 = 2(\hat{y}-y)\cdot x" data-disp="1">∂/∂w (ŷ−y)² = 2(ŷ−y)·x</span>
+    <p class="note">Averaging over all n houses, and doing the same for b (whose inner slope is just 1):</p>
+    <span class="eq" data-tex="\frac{\partial L}{\partial w} = \frac{2}{n}\sum_{i=1}^{n}(\hat{y}_i - y_i)\,x_i \qquad\qquad \frac{\partial L}{\partial b} = \frac{2}{n}\sum_{i=1}^{n}(\hat{y}_i - y_i)" data-disp="1">∂L/∂w = (2/n) Σ(ŷᵢ−yᵢ)·xᵢ        ∂L/∂b = (2/n) Σ(ŷᵢ−yᵢ)</span>
+    <div class="glossary">
+      <span class="chip"><b>∂</b> "partial" — a derivative taken for one knob while the other holds still</span>
+      <span class="chip"><b>∂L/∂w</b> how fast loss changes when only w is nudged</span>
+      <span class="chip"><b>∂L/∂b</b> how fast loss changes when only b is nudged</span>
+      <span class="chip"><b>(ŷᵢ−yᵢ)</b> the error on point i — both formulas are built from it</span>
+    </div>
+    <p class="note" style="margin-top:12px"><strong>Reading them in plain words:</strong> the w-slope is the average error <em>scaled by the input x</em> — larger inputs demand larger weight adjustments, because a change in w matters more when x is big. The b-slope is simply the average error itself — no scaling, because b shifts every prediction equally regardless of x.</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Interactive · feel the gradient at any knob setting</span>
+    <h3>Two slopes, two suggested nudges</h3>
+    <p class="note">Set the knobs anywhere. The gradient reports the two slopes; each arrow shows the direction the update will push that knob (opposite the slope) and how urgently. Notice: near the best line, both arrows shrink toward nothing — flat ground.</p>
+    <div class="controls">
+      <div class="knob">
+        <label>weight w <b id="w5v">0.5</b></label>
+        <input type="range" id="w5" min="-1" max="4" step="0.05" value="0.5">
+      </div>
+      <div class="knob">
+        <label>bias b <b id="b5v">0.0</b></label>
+        <input type="range" id="b5" min="-2" max="4" step="0.05" value="0">
+      </div>
+    </div>
+    <div class="garrow"><span class="gl" id="gwv">∂L/∂w = −18.00</span><div class="gtrack"><div class="gfill" id="gwbar"></div></div><span class="gdir" id="gwdir">→ push w up</span></div>
+    <div class="garrow"><span class="gl" id="gbv">∂L/∂b = −8.00</span><div class="gtrack"><div class="gfill" id="gbbar"></div></div><span class="gdir" id="gbdir">→ push b up</span></div>
+    <div class="big-metric"><span class="v" id="mse5">…</span><span class="l">current loss at this (w, b)</span></div>
+    <div class="btnrow"><button class="btn orange" id="gstep">Follow the arrows: one update with α = 0.1</button></div>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">Real-life consequence · why the size of x matters</span>
+    <h3>Square feet vs. bedrooms: an unfair tug-of-war</h3>
+    <p class="note">Because the w-slope is <em>error × x</em>, the raw size of x sneaks into the gradient. Give a house two features — size = 2,000 sq ft and bedrooms = 3 — and suppose the model is off by 5. The same formula, 2 × error × x, gives each feature's gradient:</p>
+    <div class="bars">
+      <div class="barrow"><span class="who" style="font-size:13px">Size (x=2000)</span><div class="bartrack"><div class="barfill a" id="fbar1"></div></div><span class="winner">20,000</span></div>
+      <div class="barrow"><span class="who" style="font-size:13px">Bedrooms (x=3)</span><div class="bartrack"><div class="barfill b" id="fbar2"></div></div><span class="winner">30</span></div>
+    </div>
+    <p class="note" style="margin-top:10px">The size weight's gradient is over <strong>600× larger</strong> — not because size truly matters 600× more, but purely because its numbers happen to be thousands of times bigger. One knob would take enormous steps while the other barely learns. (The bar above is drawn on a compressed scale just so the bedroom bar is visible at all.) This is why, in practice, features are <strong>scaled to similar ranges before training</strong> — it returns as a pitfall in Section 11.</p>
+  </div>
+</section>
+
+<!-- ============ SECTION 6 ============ -->
+<section id="s6" class="chapter reveal">
+  <span class="eyebrow">Section 06</span>
+  <h2>Gradient descent: the update rule</h2>
+  <div class="prose">
+    <p>We now know which direction makes the loss <em>worse</em>. So we take a small step in the <strong>opposite</strong> direction, re-measure the slope from our new position, and repeat. Each step nudges w and b a little closer to the values that minimize error. This "step downhill, feel again, step again" ritual is <strong>gradient descent</strong> — the core learning mechanism behind almost all of modern ML, including deep neural networks.</p>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">The update rule</span>
+    <span class="eq" data-tex="w := w - \alpha\,\frac{\partial L}{\partial w} \qquad\qquad b := b - \alpha\,\frac{\partial L}{\partial b}" data-disp="1">w := w − α·∂L/∂w        b := b − α·∂L/∂b</span>
+    <div class="glossary">
+      <span class="chip"><b>:=</b> "update to" — replace the old value with the new one</span>
+      <span class="chip"><b>α</b> "alpha", the <em>learning rate</em> — a small positive number setting the step size</span>
+      <span class="chip"><b>−</b> the minus sign is the whole trick: go <em>against</em> the uphill direction</span>
+    </div>
+    <p class="note" style="margin-top:12px">Everything hangs on choosing α well. <strong>Too small</strong> → thousands of timid steps, training crawls. <strong>Too large</strong> → each step flies past the bottom, bouncing back and forth or even diverging (loss gets <em>worse</em>). <strong>Just right</strong> → steady, efficient descent. It's one of the most important practical judgment calls in ML — found by experimentation, and often shrunk gradually during training ("learning-rate decay").</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Interactive · three hikers, three step sizes</span>
+    <h3>Too timid, just right, too bold</h3>
+    <p class="note">Three identical hills, three hikers who differ only in step size α. Press run and compare their fates.</p>
+    <div class="btnrow"><button class="btn orange" id="runlr">Run all three</button></div>
+    <div class="trio">
+      <div class="cell"><h4>Too small <code>α = 0.02</code></h4><canvas id="cv6a"></canvas><div class="status" id="st6a">ready</div></div>
+      <div class="cell"><h4>Just right <code>α = 0.35</code></h4><canvas id="cv6b"></canvas><div class="status" id="st6b">ready</div></div>
+      <div class="cell"><h4>Too large <code>α = 1.15</code></h4><canvas id="cv6c"></canvas><div class="status" id="st6c">ready</div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 7 ============ -->
+<section id="s7" class="chapter reveal">
+  <span class="eyebrow">Section 07</span>
+  <h2>The training loop: four steps on repeat</h2>
+  <div class="prose">
+    <p>That's every ingredient. Training a model is simply repeating four steps, over and over: <strong>guess, measure the mistake, ask which direction reduces it, adjust.</strong> Nothing more mysterious than that.</p>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">Real-life analogy · seasoning a soup</span>
+    <h3>Taste, judge, adjust, taste again</h3>
+    <p class="note">A cook doesn't compute the perfect amount of salt in advance. They taste the soup (<em>predict</em>), notice it's too bland (<em>measure the error</em>), decide salt — not sugar — is what's missing and roughly how much (<em>the gradient: which knob, which direction</em>), add a pinch rather than the whole box (<em>a small step, the learning rate</em>) — and taste again. Round and round until it's right.</p>
+    <div class="loopwrap">
+      <svg id="loopsvg" viewBox="0 0 420 300" role="img" aria-label="The four-step training loop">
+        <defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#9BB0A6"></path></marker></defs>
+        <path class="arrow" d="M 210 62 Q 330 62 342 118"></path>
+        <path class="arrow" d="M 342 182 Q 330 238 216 238"></path>
+        <path class="arrow" d="M 204 238 Q 90 238 78 182"></path>
+        <path class="arrow" d="M 78 118 Q 90 62 204 62"></path>
+        <g class="node" id="ln0"><rect x="140" y="12" width="140" height="52" rx="12"></rect><text x="210" y="34" text-anchor="middle">1 · Predict</text><text x="210" y="52" text-anchor="middle" class="sub">taste the soup — ŷ = wx + b</text></g>
+        <g class="node" id="ln1"><rect x="292" y="124" width="122" height="52" rx="12"></rect><text x="353" y="146" text-anchor="middle">2 · Measure</text><text x="353" y="164" text-anchor="middle" class="sub">too bland? — the loss L</text></g>
+        <g class="node" id="ln2"><rect x="140" y="236" width="140" height="52" rx="12"></rect><text x="210" y="258" text-anchor="middle">3 · Gradient</text><text x="210" y="276" text-anchor="middle" class="sub">what's missing? ∂L/∂w, ∂L/∂b</text></g>
+        <g class="node" id="ln3"><rect x="8" y="124" width="122" height="52" rx="12"></rect><text x="69" y="146" text-anchor="middle">4 · Update</text><text x="69" y="164" text-anchor="middle" class="sub">a pinch more — α step</text></g>
+      </svg>
+    </div>
+  </div>
+
+  <div class="panel mathp">
+    <span class="tag">The algorithm, spelled out</span>
+    <p class="note" style="margin-bottom:6px"><strong>1.</strong> Initialize w and b (often to zero, or small random values).<br>
+    <strong>2.</strong> Repeat, for a fixed number of iterations or until the loss stops improving:<br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<strong>a.</strong> Predict for every data point: <span class="eq-inline" data-tex="\hat{y}_i = w\,x_i + b">ŷᵢ = w·xᵢ + b</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<strong>b.</strong> Measure: <span class="eq-inline" data-tex="L = \tfrac{1}{n}\sum(\hat{y}_i-y_i)^2">L = (1/n) Σ(ŷᵢ−yᵢ)²</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<strong>c.</strong> Compute both gradients: <span class="eq-inline" data-tex="\partial L/\partial w,\ \partial L/\partial b">∂L/∂w, ∂L/∂b</span><br>
+    &nbsp;&nbsp;&nbsp;&nbsp;<strong>d.</strong> Update both knobs: <span class="eq-inline" data-tex="w := w - \alpha\,\partial L/\partial w,\quad b := b - \alpha\,\partial L/\partial b">w := w − α·∂L/∂w, b := b − α·∂L/∂b</span><br>
+    <strong>3.</strong> Return the final w and b — that pair <em>is</em> the trained model.</p>
+    <p class="note"><strong>How do we know when to stop?</strong> Common choices: a fixed number of iterations ("epochs"), the loss improving by less than a tiny threshold between iterations (convergence), or error on held-out data starting to rise — an early warning of <em>overfitting</em>, covered in later chapters.</p>
+    <p class="note">The player below runs this exact loop on our three houses — Section 8 walks through what its first iterations mean, number by number.</p>
+  </div>
+</section>
+
+<!-- ============ SECTION 8 ============ -->
+<section id="s8" class="chapter reveal">
+  <span class="eyebrow">Section 08</span>
+  <h2>The worked example, running live</h2>
+  <div class="prose">
+    <p>Let's make everything concrete. Our dataset: three houses, size x = [1, 2, 3], price y = [3, 5, 7]. (Secretly the true relationship is <strong>y = 2x + 1</strong> — but the model doesn't know that. It must discover it.) Setup, exactly as in the chapter: start at <strong>w = 0, b = 0</strong>, learning rate <strong>α = 0.1</strong>.</p>
+    <p><strong>Iteration 1 by hand.</strong> With both knobs at zero, every prediction is 0, so the errors are [−3, −5, −7] and the loss is (1/3)(9 + 25 + 49) = <strong>27.67</strong>. The gradients: ∂L/∂w = (2/3)(−3·1 − 5·2 − 7·3) = <strong>−22.67</strong> and ∂L/∂b = (2/3)(−15) = <strong>−10</strong>. Both slopes are steeply negative — the bowl tilts hard toward larger w and b — so the updates push both knobs up: w becomes 0 − 0.1(−22.67) = <strong>2.267</strong> and b becomes 0 − 0.1(−10) = <strong>1.0</strong>. One step, and the loss collapses from 27.67 to about 0.33.</p>
+    <p><strong>Iteration 2</strong> refines the slight overshoot: the new predictions [3.267, 5.533, 7.8] are all a touch high, the gradients turn small and positive, and the knobs ease back to w ≈ 2.018, b ≈ 0.893. From there the loss keeps shrinking as w → 2 and b → 1 — exactly the true rule y = 2x + 1. Gradient descent, working precisely as intended. Watch it happen:</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Interactive · the training-loop player</span>
+    <h3>Predict → measure → gradient → update, on repeat</h3>
+    <div class="btnrow">
+      <button class="btn orange" id="tplay">▶ Play</button>
+      <button class="btn ghost" id="tstep">Step once</button>
+      <button class="btn ghost" id="treset">Reset</button>
+      <select id="tspeed" aria-label="Playback speed"><option value="1">1× speed</option><option value="2">2×</option><option value="4">4×</option></select>
+    </div>
+    <div class="trainhead">
+      <span><span class="k">iteration</span><br><b id="titer">0</b></span>
+      <span><span class="k">weight w</span><br><b id="tw" style="color:var(--model)">0.000</b></span>
+      <span><span class="k">bias b</span><br><b id="tb" style="color:var(--model)">0.000</b></span>
+      <span><span class="k">loss L</span><br><b id="tloss" style="color:var(--err)">27.67</b></span>
+      <span id="tstatus" style="color:var(--ink-soft); font-size:13px"></span>
+    </div>
+    <div class="duo">
+      <canvas id="cv8line" class="plot"></canvas>
+      <canvas id="cv8loss" class="plot"></canvas>
+    </div>
+    <details class="arith" open>
+      <summary>The arithmetic of the current step (matches the chapter's hand computation)</summary>
+      <pre id="tarith">Press Step or Play to begin.</pre>
+    </details>
+    <div class="logbox">
+      <table class="t">
+        <thead><tr><th>iteration</th><th>w</th><th>b</th><th>loss</th></tr></thead>
+        <tbody id="tlog"></tbody>
+      </table>
+    </div>
+    <p class="note" style="margin-top:12px">The chapter shows the same pattern holds on completely different data — predicting ice-cream sales from temperature — where the identical four-step loop drives the loss down just as fast (with a smaller α, because those x values are larger — feature scaling again). Different units, same machinery: <strong>predict, measure, gradient, update</strong> works on any linear dataset.</p>
+  </div>
+</section>
+
+<!-- ============ SECTION 9 ============ -->
+<section id="s9" class="chapter reveal">
+  <span class="eyebrow">Section 09</span>
+  <h2>Visual intuition: the bowl</h2>
+  <div class="prose">
+    <p>Now the picture that ties it all together. Plot the loss L for <em>every possible combination</em> of w and b and you get a <strong>bowl-shaped surface</strong>: high walls where the line fits badly, a single lowest point at w = 2, b = 1 where it fits perfectly. Training never sees this whole bowl — it only ever feels the local slope — yet the path it traces bends steadily inward toward the bottom, loss shrinking with every step. That path below is the <em>actual</em> descent on our house data, starting from w = 0, b = 0.</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Interactive · the loss landscape and the descent path</span>
+    <h3>Watching the walk from above — and from the side</h3>
+    <div class="btnrow">
+      <div class="toggle" role="tablist">
+        <button id="mContour" class="on">Contour map (from above)</button>
+        <button id="m3d">3D bowl (from the side)</button>
+      </div>
+      <button class="btn orange" id="replay9">Replay the descent</button>
+    </div>
+    <canvas id="cv9" class="plot tall"></canvas>
+    <p class="note" style="margin-top:10px">Dark valley = low loss, pale ridges = high loss. The green dot marks the bottom of the bowl (w = 2, b = 1). The orange trail is gradient descent feeling its way down — big confident strides where the slope is steep, tiny careful steps as the ground flattens near the bottom.</p>
+  </div>
+</section>
+
+<!-- ============ SECTION 10 ============ -->
+<section id="s10" class="chapter reveal">
+  <span class="eyebrow">Section 10</span>
+  <h2>From simple to general</h2>
+  <div class="prose">
+    <p>Here's the payoff. Everything in this chapter — a model with weights and biases, a loss measuring error, gradients from calculus, an update rule stepping downhill — is <strong>exactly the same machinery</strong> used in logistic regression and in deep neural networks. Only two things ever change in fancier models: the <em>shape</em> of the function f(x), and the specific loss used. The core loop — predict, measure, gradient, update — stays identical. That's why gradient descent is called the workhorse of modern machine learning.</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Direction 1 · classification with logistic regression</span>
+    <h3>Same knobs, squeezed into an S</h3>
+    <p class="note">To predict a <em>probability</em> ("is this email spam?") instead of a number, we take our familiar wx + b and squeeze it through an S-shaped curve called the <strong>sigmoid</strong> — its output always lands between 0 and 1, perfect for probabilities. Drag w and watch: the knob still controls steepness, exactly as it did for the line.</p>
+    <span class="eq" data-tex="\hat{y} = \frac{1}{1 + e^{-(wx+b)}}" data-disp="1">ŷ = 1 / (1 + e^−(wx+b))</span>
+    <div class="glossary">
+      <span class="chip"><b>e</b> a fixed math constant (≈ 2.718) that makes the S-shape smooth</span>
+      <span class="chip"><b>ŷ</b> now a probability between 0 and 1, instead of a price</span>
+    </div>
+    <div class="controls" style="margin-top:14px">
+      <div class="knob" style="max-width:340px">
+        <label>weight w — steepness of the S <b id="w10v">1.0</b></label>
+        <input type="range" id="w10" min="0.2" max="4" step="0.05" value="1">
+      </div>
+    </div>
+    <canvas id="cv10" class="plot short"></canvas>
+    <p class="note" style="margin-top:10px">The weights are learned by the very same gradient-descent updates — only the loss changes, to one better suited for probabilities (called <em>cross-entropy loss</em>).</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">Direction 2 · neural networks</span>
+    <h3>Stacks of weighted sums</h3>
+    <p class="note">A neural network is just <em>many</em> of our little equations stacked in layers, each feeding the next: layer₁ = wx + b, layer₂ = w′·(layer₁) + b′, and so on — with a non-linear bend (like ReLU) between layers so the network can learn curves, not just straight lines. In the sketch below, <strong>every glowing connection is another w, and every circle adds another b</strong>:</p>
+    <svg id="nnsvg" viewBox="0 0 380 200" role="img" aria-label="A small neural network of weighted connections">
+      <line class="pulse" x1="50" y1="60" x2="180" y2="35"></line>
+      <line x1="50" y1="60" x2="180" y2="85"></line>
+      <line class="pulse" x1="50" y1="60" x2="180" y2="135"></line>
+      <line x1="50" y1="140" x2="180" y2="35"></line>
+      <line class="pulse" x1="50" y1="140" x2="180" y2="85"></line>
+      <line x1="50" y1="140" x2="180" y2="135"></line>
+      <line x1="50" y1="60" x2="180" y2="165"></line>
+      <line class="pulse" x1="50" y1="140" x2="180" y2="165"></line>
+      <line class="pulse" x1="180" y1="35" x2="320" y2="100"></line>
+      <line x1="180" y1="85" x2="320" y2="100"></line>
+      <line class="pulse" x1="180" y1="135" x2="320" y2="100"></line>
+      <line x1="180" y1="165" x2="320" y2="100"></line>
+      <circle cx="50" cy="60" r="14"></circle><circle cx="50" cy="140" r="14"></circle>
+      <circle cx="180" cy="35" r="14"></circle><circle cx="180" cy="85" r="14"></circle>
+      <circle cx="180" cy="135" r="14"></circle><circle cx="180" cy="165" r="14"></circle>
+      <circle cx="320" cy="100" r="14"></circle>
+      <text x="50" y="180" text-anchor="middle" style="font:12px var(--body); fill:var(--ink-soft)">inputs x</text>
+      <text x="320" y="135" text-anchor="middle" style="font:12px var(--body); fill:var(--ink-soft)">output ŷ</text>
+    </svg>
+    <p class="note" style="margin-top:10px">Training is identical in spirit to what we derived by hand: predict, compute the loss, compute the gradient of <em>every</em> weight via the chain rule, update. The chain rule simply gets applied more times — once per layer — and that repeated application has a famous name: <strong>backpropagation</strong>.</p>
+  </div>
+</section>
+
+<!-- ============ SECTION 11 ============ -->
+<section id="s11" class="chapter reveal">
+  <span class="eyebrow">Section 11</span>
+  <h2>Summary and key takeaways</h2>
+
+  <div class="panel mathp">
+    <span class="tag">The five formulas that ran this whole chapter</span>
+    <div class="formulas">
+      <div class="fcard"><span class="fn">The model</span><span class="eq" style="margin:4px 0" data-tex="\hat{y} = w\,x + b">ŷ = w·x + b</span></div>
+      <div class="fcard"><span class="fn">The loss (MSE)</span><span class="eq" style="margin:4px 0" data-tex="L = \tfrac{1}{n}\sum(\hat{y}_i - y_i)^2">L = (1/n) Σ(ŷᵢ−yᵢ)²</span></div>
+      <div class="fcard"><span class="fn">Gradient for w</span><span class="eq" style="margin:4px 0" data-tex="\tfrac{\partial L}{\partial w} = \tfrac{2}{n}\sum(\hat{y}_i - y_i)\,x_i">∂L/∂w = (2/n) Σ(ŷᵢ−yᵢ)·xᵢ</span></div>
+      <div class="fcard"><span class="fn">Gradient for b</span><span class="eq" style="margin:4px 0" data-tex="\tfrac{\partial L}{\partial b} = \tfrac{2}{n}\sum(\hat{y}_i - y_i)">∂L/∂b = (2/n) Σ(ŷᵢ−yᵢ)</span></div>
+      <div class="fcard"><span class="fn">The update rule</span><span class="eq" style="margin:4px 0" data-tex="w := w - \alpha\,\tfrac{\partial L}{\partial w}, \quad b := b - \alpha\,\tfrac{\partial L}{\partial b}">w := w − α·∂L/∂w,  b := b − α·∂L/∂b</span></div>
+    </div>
+    <div class="glossary" style="margin-top:16px">
+      <span class="chip"><b>ŷ</b> the model's prediction</span>
+      <span class="chip"><b>w</b> weight — the slope knob</span>
+      <span class="chip"><b>b</b> bias — the height knob</span>
+      <span class="chip"><b>α</b> learning rate — the step size</span>
+      <span class="chip"><b>Σ</b> add up, one term per data point</span>
+      <span class="chip"><b>∂</b> slope for one knob, other knobs held still</span>
+      <span class="chip"><b>n</b> number of data points</span>
+      <span class="chip"><b>L</b> the loss — how wrong, overall</span>
+    </div>
+  </div>
+
+  <div class="panel">
+    <span class="tag" style="color:var(--err); background:var(--err-soft)">Common pitfalls to watch for</span>
+    <div class="pits">
+      <div class="pit">
+        <svg viewBox="0 0 160 54" preserveAspectRatio="none"><path stroke="#D5484D" d="M4,30 L24,12 L44,44 L64,6 L84,50 L104,3 L124,52 L150,2"></path></svg>
+        <h4>Learning rate too high</h4>
+        <p>The loss oscillates wildly or diverges instead of shrinking — every step overshoots the bottom of the bowl (Section 6's third hiker).</p>
+      </div>
+      <div class="pit">
+        <svg viewBox="0 0 160 54" preserveAspectRatio="none"><path stroke="#B98214" d="M4,8 C40,14 80,22 150,44"></path></svg>
+        <h4>Learning rate too low</h4>
+        <p>Training technically works but takes far too long to converge — thousands of timid steps (the first hiker, still crawling).</p>
+      </div>
+      <div class="pit">
+        <svg viewBox="0 0 160 54"><rect x="8" y="10" width="130" height="12" rx="6" fill="#2D5E8B"></rect><rect x="8" y="32" width="8" height="12" rx="4" fill="#1E9E6A"></rect></svg>
+        <h4>Unscaled features</h4>
+        <p>Features with very different ranges (square feet vs. bedroom count) produce wildly imbalanced gradients and unstable training. Normalize or standardize features first (Section 5's tug-of-war).</p>
+      </div>
+      <div class="pit">
+        <svg viewBox="0 0 160 54" preserveAspectRatio="none"><path stroke="#41565E" d="M4,6 C30,52 50,52 70,26 C90,4 110,10 130,50 C140,52 148,40 156,20"></path><circle cx="52" cy="47" r="5" fill="#FF6B35"></circle></svg>
+        <h4>Local minima</h4>
+        <p>Our loss is a perfect bowl with one bottom — but more complex models have bumpy surfaces where descent can settle into a valley that isn't the lowest one. Advanced optimizers (later chapters) help escape.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="panel analogy">
+    <span class="tag">The whole chapter in one sentence</span>
+    <p style="font-family:var(--disp); font-weight:700; font-size:clamp(19px,2.6vw,24px); line-height:1.4; margin:4px 0 0">Machine Learning, at its core, is adjusting weights and biases in the direction that reduces prediction error, guided step-by-step by derivatives — and gradient descent is simply the disciplined, repeated application of that idea until the predictions are as accurate as possible.</p>
+  </div>
+</section>
+
+<section id="comments" class="chapter reveal">
+  <span class="eyebrow">Join the discussion</span>
+  <h2>Comments</h2>
+  <p class="note" id="commentsConfigNote" hidden>Comments and likes aren't connected to a backend yet — search this file for "SUPABASE_URL" for setup steps. They'll still work on this screen, but won't be saved or shown to other visitors until that's done.</p>
+  <div class="panel demo">
+    <span class="tag">Leave a comment on the chapter</span>
+    <textarea id="cBody" class="ctextarea" rows="3" placeholder="Ask a question, share what clicked for you…"></textarea>
+    <div class="btnrow"><button class="btn orange" id="cSubmit">Post comment</button></div>
+    <div class="note" id="cStatus" style="margin-top:6px"></div>
+    <div class="clist" id="cList"></div>
+  </div>
+</section>
+
+<footer>
+  <p>Built from <em>Machine Learning from First Principles</em> — every number in the demos is computed live with the chapter's own formulas. Scroll back up any time; the loss will happily climb back to 27.67.</p>
+</footer>
+
+</div>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js" defer onload="window.__texReady && window.__texReady()"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer onload="window.__sbReady && window.__sbReady()"></script>
+<script>
+(function(){
+'use strict';
+/* =============== SETUP: paste your Supabase project details here =============== *
+ * 1. Create a free project at https://supabase.com
+ * 2. In the SQL editor, run the schema from the comment block further down
+ *    (search for "SQL SETUP" in this file).
+ * 3. Project Settings → API → copy the "Project URL" and "anon public" key below.
+ * Until you do this, likes/comments still work visually but aren't saved anywhere.
+ * ================================================================================ */
+var CONFIG = {
+  SUPABASE_URL: 'YOUR_SUPABASE_URL',       // e.g. 'https://xxxxxxxx.supabase.co'
+  SUPABASE_ANON_KEY: 'YOUR_SUPABASE_ANON_KEY',
+  ARTICLE_ID: 'ml-fundamentals'            // unique per write-up — keeps likes/comments from mixing across articles that share one Supabase project
+};
+/* =============== shared math (the chapter's formulas) =============== */
+var DX=[1,2,3], DY=[3,5,7], N=3;
+function predict(w,b,x){ return w*x+b; }
+function loss(w,b){ var s=0; for(var i=0;i<N;i++){ var e=predict(w,b,DX[i])-DY[i]; s+=e*e; } return s/N; }
+function grad(w,b){ var gw=0,gb=0; for(var i=0;i<N;i++){ var e=predict(w,b,DX[i])-DY[i]; gw+=e*DX[i]; gb+=e; } return [2*gw/N, 2*gb/N]; }
+function fmt(v,d){ return v.toFixed(d===undefined?2:d); }
+function fmtLoss(L){ return L>=10?L.toFixed(2):(L>=0.1?L.toFixed(2):(L<1e-6?'0.000000':L.toFixed(6).replace(/0+$/,'').replace(/\.$/,''))); }
+window.__ML={loss:loss,grad:grad}; // exposed for automated verification
+
+var reduced=false;
+try{ reduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches; }catch(e){}
+
+/* =============== tiny canvas plot helper =============== */
+var CSS = getComputedStyle(document.documentElement);
+function col(name){ return CSS.getPropertyValue(name).trim() || '#000'; }
+var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:col('--hair-2'),
+          model:col('--model'), truth:col('--truth'), data:col('--data'), err:col('--err') };
+
+var redraws=[];
+function Plot(canvas,cfg){
+  this.cv=canvas; this.cfg=cfg;
+  this.ctx = canvas && canvas.getContext ? canvas.getContext('2d') : null;
+  this.padL=cfg.padL!==undefined?cfg.padL:44; this.padR=cfg.padR!==undefined?cfg.padR:14;
+  this.padT=cfg.padT!==undefined?cfg.padT:14; this.padB=cfg.padB!==undefined?cfg.padB:34;
+  this.resize();
+}
+Plot.prototype.resize=function(){
+  if(!this.cv) return;
+  var dpr=window.devicePixelRatio||1;
+  var w=this.cv.clientWidth||600, h=this.cv.clientHeight||300;
+  this.cv.width=Math.round(w*dpr); this.cv.height=Math.round(h*dpr);
+  if(this.ctx){ this.ctx.setTransform(dpr,0,0,dpr,0,0); }
+  this.W=w; this.H=h;
+};
+Plot.prototype.X=function(v){ var c=this.cfg; return this.padL+(v-c.xmin)/(c.xmax-c.xmin)*(this.W-this.padL-this.padR); };
+Plot.prototype.Y=function(v){ var c=this.cfg; return this.H-this.padB-(v-c.ymin)/(c.ymax-c.ymin)*(this.H-this.padT-this.padB); };
+Plot.prototype.frame=function(){
+  var x=this.ctx, c=this.cfg; if(!x) return;
+  x.clearRect(0,0,this.W,this.H);
+  x.font='11px "IBM Plex Mono", monospace'; x.fillStyle=C.soft;
+  x.strokeStyle=C.hair2; x.lineWidth=1;
+  var i;
+  var xs=c.xticks||[], ys=c.yticks||[];
+  for(i=0;i<xs.length;i++){ var px=this.X(xs[i]);
+    x.beginPath(); x.moveTo(px,this.Y(c.ymin)); x.lineTo(px,this.Y(c.ymax)); x.stroke();
+    x.textAlign='center'; x.fillText(String(xs[i]), px, this.H-this.padB+16); }
+  for(i=0;i<ys.length;i++){ var py=this.Y(ys[i]);
+    x.beginPath(); x.moveTo(this.X(c.xmin),py); x.lineTo(this.X(c.xmax),py); x.stroke();
+    x.textAlign='right'; x.fillText(String(ys[i]), this.padL-8, py+4); }
+  x.strokeStyle=C.hair; x.beginPath();
+  x.moveTo(this.X(c.xmin),this.Y(c.ymax)); x.lineTo(this.X(c.xmin),this.Y(c.ymin)); x.lineTo(this.X(c.xmax),this.Y(c.ymin)); x.stroke();
+  if(c.xlabel){ x.fillStyle=C.soft; x.textAlign='right'; x.font='12px "Instrument Sans", sans-serif';
+    x.fillText(c.xlabel, this.X(c.xmax), this.H-6); }
+  if(c.ylabel){ x.save(); x.translate(12, this.Y(c.ymax)+4); x.rotate(-Math.PI/2); x.textAlign='right';
+    x.font='12px "Instrument Sans", sans-serif'; x.fillStyle=C.soft; x.fillText(c.ylabel,0,0); x.restore(); }
+};
+Plot.prototype.dot=function(vx,vy,r,fill,stroke){
+  var x=this.ctx; if(!x) return;
+  x.beginPath(); x.arc(this.X(vx),this.Y(vy),r,0,Math.PI*2);
+  x.fillStyle=fill; x.fill();
+  if(stroke){ x.strokeStyle=stroke; x.lineWidth=2; x.stroke(); }
+};
+Plot.prototype.seg=function(x1,y1,x2,y2,color,w,dash){
+  var x=this.ctx; if(!x) return;
+  x.beginPath(); x.setLineDash(dash||[]);
+  x.moveTo(this.X(x1),this.Y(y1)); x.lineTo(this.X(x2),this.Y(y2));
+  x.strokeStyle=color; x.lineWidth=w||2; x.stroke(); x.setLineDash([]);
+};
+Plot.prototype.fn=function(f,color,w,dash){
+  var x=this.ctx, c=this.cfg; if(!x) return;
+  x.beginPath(); x.setLineDash(dash||[]);
+  var steps=120;
+  for(var i=0;i<=steps;i++){ var vx=c.xmin+(c.xmax-c.xmin)*i/steps;
+    var vy=Math.max(c.ymin-2, Math.min(c.ymax+2, f(vx)));
+    var px=this.X(vx), py=this.Y(vy);
+    if(i===0) x.moveTo(px,py); else x.lineTo(px,py); }
+  x.strokeStyle=color; x.lineWidth=w||2.5; x.lineJoin='round'; x.stroke(); x.setLineDash([]);
+};
+Plot.prototype.dataDots=function(){
+  for(var i=0;i<N;i++) this.dot(DX[i],DY[i],6,C.data,'#fff');
+};
+function register(plot,draw){ redraws.push(function(){ plot.resize(); draw(); }); draw(); }
+function onResize(){ for(var i=0;i<redraws.length;i++) redraws[i](); }
+var rto=null;
+window.addEventListener('resize',function(){ clearTimeout(rto); rto=setTimeout(onResize,120); });
+
+function el(id){ return document.getElementById(id); }
+function on(id,ev,fn){ var e=el(id); if(e) e.addEventListener(ev,fn); }
+function animateNum(from,to,dur,cb){
+  if(reduced){ cb(to); return; }
+  var t0=null;
+  function tick(t){ if(t0===null)t0=t; var p=Math.min(1,(t-t0)/dur); p=1-Math.pow(1-p,3);
+    cb(from+(to-from)*p); if(p<1) requestAnimationFrame(tick); }
+  requestAnimationFrame(tick);
+}
+
+/* =============== signature header: descent bar =============== */
+(function(){
+  var curve=el('dcurve'), trail=el('dtrail'), ball=el('dball'), lossEl=el('lossnow');
+  if(!curve||!ball) return;
+  function pt(p){ return [8+284*p, 38-32*Math.pow(1-p,2)]; }
+  var d='', i, q;
+  for(i=0;i<=40;i++){ q=pt(i/40); d+=(i===0?'M':'L')+q[0].toFixed(1)+','+q[1].toFixed(1); }
+  curve.setAttribute('d',d);
+  function update(){
+    var doc=document.documentElement;
+    var max=(doc.scrollHeight-window.innerHeight)||1;
+    var p=Math.max(0,Math.min(1,(window.scrollY||doc.scrollTop||0)/max));
+    var b=pt(p); ball.setAttribute('cx',b[0]); ball.setAttribute('cy',b[1]);
+    var td='', k;
+    for(k=0;k<=40;k++){ var pp=k/40; if(pp>p) break; q=pt(pp); td+=(k===0?'M':'L')+q[0].toFixed(1)+','+q[1].toFixed(1); }
+    q=pt(p); td+=(td?'L':'M')+q[0].toFixed(1)+','+q[1].toFixed(1);
+    if(trail) trail.setAttribute('d',td);
+    if(lossEl) lossEl.textContent=(27.67*Math.pow(1-p,2)).toFixed(2);
+  }
+  window.addEventListener('scroll',update,{passive:true});
+  update();
+})();
+
+/* =============== reveal on scroll + scrollspy =============== */
+(function(){
+  var secs=document.querySelectorAll('section.chapter, .hero');
+  var links=document.querySelectorAll('#rail a');
+  var i;
+  if('IntersectionObserver' in window && !reduced){
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting) e.target.classList.add('in'); });
+    },{threshold:0.08});
+    for(i=0;i<secs.length;i++) io.observe(secs[i]);
+    var spy=new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(e.isIntersecting){
+          for(var j=0;j<links.length;j++) links[j].classList.toggle('on', links[j].getAttribute('data-sec')===e.target.id);
+        }
+      });
+    },{rootMargin:'-30% 0px -60% 0px'});
+    for(i=0;i<secs.length;i++){ if(secs[i].id && secs[i].id!=='top') spy.observe(secs[i]); }
+  } else {
+    for(i=0;i<secs.length;i++) secs[i].classList.add('in');
+  }
+})();
+
+/* =============== voice narrator: explains each section as you scroll =============== */
+(function(){
+  var fab=el('narrFab'), panel=el('narrPanel'); if(!fab) return;
+  var supported = ('speechSynthesis' in window);
+
+  var TITLES={ top:'Introduction', s1:'What ML is', s2:'The model', s3:'The loss',
+    s4:'Derivatives', s5:'The gradient', s6:'Gradient descent', s7:'Training loop',
+    s8:'Worked example', s9:'The bowl', s10:'Generalizing', s11:'Summary' };
+
+  // Spoken explainer scripts — written to be *heard*, not read: they explain the
+  // idea and point at what's on screen, rather than reciting the page's prose.
+  var SCRIPTS={
+    top:"Hi, welcome to Downhill. This chapter teaches machine learning the way you'd find the bottom of a hill: one small step at a time. We'll use one tiny example throughout — guessing a house's price from its size — and by the end you'll understand exactly how a machine teaches itself. Scroll down whenever you're ready, and I'll explain each idea as it comes up.",
+    s1:"Let's start with the big question: what is machine learning, actually? In regular programming, a person writes the rules by hand. Machine learning flips that around. Instead of writing rules, we show the computer lots of examples — inputs and their correct answers — and let it figure out the rule on its own. In the chart here, each gray line is a different guess at the rule connecting house size to price. Machine learning's whole job is finding the one line that fits best, automatically, instead of a person eyeballing it.",
+    s2:"Now let's look at the model itself. It's just a straight line with two adjustable knobs. The first knob, the weight, controls how steep the line is — how much price goes up for every extra bit of size. The second knob, the bias, controls where the line starts. Try dragging those two sliders yourself. And notice the college admissions example below: the exact same two students get ranked in opposite order just because the weights changed. That's really all a weight is — how much one factor counts toward the final answer.",
+    s3:"Once we have a line, how do we know if it's any good? We need one number that says how wrong it is. For every house, we compare the prediction to the real price, square that difference, and average the squares. Squaring does two things: it stops positive and negative errors from canceling out, and it punishes big mistakes far more than small ones. Try the sliders below — start on the bad line, where the loss is seventeen and a half, then switch to the good line, where every error vanishes and the loss drops to zero.",
+    s4:"So we can measure how wrong we are — but how do we get less wrong? That's where derivatives come in. Imagine standing blindfolded on a hilly surface, feeling with your feet which way is downhill, and taking a small step that direction. A derivative is exactly that feeling, turned into a number: the slope of the ground at the exact spot you're standing. Try the hiker demo below — read the slope, take a step downhill, or let it walk itself all the way to the bottom.",
+    s5:"Our model has two knobs, so we need a slope for each one separately. Together, those two slopes are called the gradient, and they point toward the direction where the error gets worse fastest — so to improve, we move exactly the opposite way. Try the sliders below: the two arrows show which direction each knob wants to move, and how urgently. And look at the size example underneath — because square footage is measured in much bigger numbers than bedroom count, its gradient ends up hundreds of times larger, which is exactly why real data gets rescaled before training.",
+    s6:"Now that we know which way is downhill, gradient descent is simply: take a small step that way, check the slope again, and repeat. How big should that step be? That's the learning rate. Press run on the three hikers below and watch: too small a step and progress crawls forever; too large a step and the hiker overshoots, bouncing around and sometimes never settling. Somewhere in between is just right — steady progress straight to the bottom.",
+    s7:"Put it all together and training a model becomes wonderfully simple: repeat four steps, over and over. Predict, measure how wrong you were, figure out which direction reduces the error, and adjust — just a little. It's exactly like a cook tasting soup, noticing it needs more salt, adding a pinch, and tasting again. Nothing more mysterious than that, repeated as many times as it takes.",
+    s8:"Let's watch that loop actually run, on our three houses. We start with both knobs at zero — a terrible guess, with a loss of twenty seven point six seven. Press play and watch the very first step: in a single update, the loss collapses to about a third. By the second step it's down near zero point zero two. The weight is homing in on two, and the bias on one — exactly the true relationship hiding in the data. That's gradient descent working precisely as intended, right in front of you.",
+    s9:"Here's the picture that ties everything together. If you plotted the loss for every possible pair of weight and bias, you'd get a bowl-shaped surface — steep walls where the line fits badly, one lowest point where it fits perfectly. Training never sees this whole bowl at once; it only ever feels the local slope underfoot. Watch the orange trail below — that's the actual path our training took, spiraling inward toward the bottom. Try switching to the three dimensional view to really see the shape of that bowl.",
+    s10:"Here's the payoff for everything we've learned. This same machinery — weights, a loss, gradients, a step-downhill update — powers far more advanced models too. To predict a probability instead of a price, we squeeze our line through an S-shaped curve called a sigmoid. And a full neural network is just many of these little equations stacked in layers, each adding its own weights and biases. The training loop barely changes — the same predict, measure, adjust, repeated once per layer, in a process called backpropagation.",
+    s11:"Let's bring it all together. Five formulas ran this entire chapter: the model, the loss, the two gradients, and the update rule. Watch for a few common traps: a learning rate that's too high makes training bounce around instead of settling; one that's too low makes it crawl; unscaled features let one knob overpower the others. And if there's one sentence to leave you with, it's this: machine learning is adjusting weights and biases in the direction that reduces error, guided by derivatives, one disciplined step at a time — until the model gets it right."
+  };
+
+  var narrationOn=false, currentId=null, lastVisible='top';
+
+  function setSpeakingUI(id,speaking){
+    fab.classList.toggle('speaking', !!speaking);
+    var links=document.querySelectorAll('#rail a');
+    for(var i=0;i<links.length;i++) links[i].classList.toggle('speaking', speaking && links[i].getAttribute('data-sec')===id);
+  }
+  function statusIdle(){ el('narrStatus').textContent = narrationOn ? 'On — narrating as you scroll.' : 'Off — press "Turn on" to begin.'; }
+  function statusSpeaking(id){ el('narrStatus').innerHTML = 'Speaking — <b>'+(TITLES[id]||id)+'</b>'; }
+
+  function getSelectedVoice(){
+    if(!supported) return null;
+    var val=el('narrVoice').value, voices=window.speechSynthesis.getVoices();
+    for(var i=0;i<voices.length;i++){ if(voices[i].name+'|'+voices[i].lang===val) return voices[i]; }
+    return voices[0]||null;
+  }
+  function populateVoices(){
+    if(!supported) return;
+    var voices=window.speechSynthesis.getVoices(); if(!voices.length) return;
+    var sel=el('narrVoice'); if(sel.options.length) return; // already populated
+    var en=voices.filter(function(v){return /^en/i.test(v.lang);});
+    var rest=voices.filter(function(v){return !/^en/i.test(v.lang);});
+    (en.length?en.concat(rest):voices).forEach(function(v){
+      var o=document.createElement('option'); o.value=v.name+'|'+v.lang; o.textContent=v.name+' ('+v.lang+')';
+      sel.appendChild(o);
+    });
+  }
+  if(supported){
+    populateVoices();
+    window.speechSynthesis.onvoiceschanged=populateVoices;
+  }
+
+  function speak(id){
+    if(!supported) return;
+    var text=SCRIPTS[id]; if(!text) return;
+    window.speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(text);
+    var v=getSelectedVoice(); if(v) u.voice=v;
+    u.rate=0.98; u.pitch=1;
+    u.onstart=function(){ setSpeakingUI(id,true); statusSpeaking(id); el('narrPauseBtn').disabled=false; el('narrPauseBtn').textContent='Pause'; };
+    u.onend=function(){ setSpeakingUI(id,false); statusIdle(); };
+    u.onerror=function(){ setSpeakingUI(id,false); statusIdle(); };
+    window.speechSynthesis.speak(u);
+    currentId=id;
+  }
+
+  function turnOn(){
+    narrationOn=true;
+    el('narrOnOff').textContent='Turn off';
+    fab.classList.add('active');
+    statusIdle();
+    if(lastVisible) speak(lastVisible);
+  }
+  function turnOff(){
+    narrationOn=false;
+    if(supported) window.speechSynthesis.cancel();
+    el('narrOnOff').textContent='Turn on';
+    fab.classList.remove('active');
+    setSpeakingUI(null,false);
+    el('narrPauseBtn').disabled=true; el('narrPauseBtn').textContent='Pause';
+    currentId=null;
+    statusIdle();
+  }
+
+  if(!supported){
+    statusIdle();
+    el('narrStatus').textContent="Voice narration isn't supported in this browser.";
+    el('narrOnOff').disabled=true; el('narrReplay').disabled=true; el('narrPauseBtn').disabled=true; el('narrVoice').disabled=true;
+  } else {
+    statusIdle();
+  }
+
+  on('narrFab','click',function(){
+    var hidden=panel.hasAttribute('hidden');
+    if(hidden){ panel.removeAttribute('hidden'); fab.setAttribute('aria-expanded','true'); }
+    else { panel.setAttribute('hidden',''); fab.setAttribute('aria-expanded','false'); }
+  });
+  on('narrOnOff','click',function(){ narrationOn?turnOff():turnOn(); });
+  on('narrReplay','click',function(){ var id=currentId||lastVisible; if(id) speak(id); });
+  on('narrPauseBtn','click',function(){
+    if(!supported||!window.speechSynthesis.speaking) return;
+    if(window.speechSynthesis.paused){ window.speechSynthesis.resume(); el('narrPauseBtn').textContent='Pause'; }
+    else { window.speechSynthesis.pause(); el('narrPauseBtn').textContent='Resume'; }
+  });
+
+  // Track which section is on screen; narrate on change, whenever narration is on.
+  var secs=document.querySelectorAll('section.chapter, .hero');
+  if('IntersectionObserver' in window){
+    var nio=new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(e.isIntersecting){
+          lastVisible=e.target.id;
+          if(narrationOn && lastVisible!==currentId) speak(lastVisible);
+        }
+      });
+    },{rootMargin:'-25% 0px -55% 0px'});
+    for(var i=0;i<secs.length;i++) nio.observe(secs[i]);
+  }
+})();
+
+/* =============== likes, comments, and email capture (Supabase-backed) =============== *
+ * SQL SETUP — run this once in your Supabase project's SQL editor. This same
+ * project and these same three tables can be shared by every article on your
+ * site — each row is tagged with article_id so they never mix.
+ *
+ *   create table subscribers (
+ *     id uuid primary key default gen_random_uuid(),
+ *     email text not null,
+ *     article_id text,
+ *     created_at timestamptz default now()
+ *   );
+ *   create table likes (
+ *     id uuid primary key default gen_random_uuid(),
+ *     article_id text not null,
+ *     section_id text not null,
+ *     email text not null,
+ *     created_at timestamptz default now(),
+ *     unique(article_id, section_id, email)
+ *   );
+ *   create table comments (
+ *     id uuid primary key default gen_random_uuid(),
+ *     article_id text not null,
+ *     section_id text not null default 'general',
+ *     email text not null,
+ *     name text,
+ *     body text not null,
+ *     created_at timestamptz default now(),
+ *     approved boolean not null default false
+ *   );
+ *   alter table subscribers enable row level security;
+ *   alter table likes enable row level security;
+ *   alter table comments enable row level security;
+ *   create policy "insert subscribers" on subscribers for insert to anon with check (true);
+ *   create policy "insert likes" on likes for insert to anon with check (true);
+ *   create policy "read likes" on likes for select to anon using (true);
+ *   create policy "insert comments" on comments for insert to anon with check (true);
+ *   create policy "read approved comments" on comments for select to anon using (approved = true);
+ *
+ * New comments default to approved = false — approve them in the Supabase Table
+ * Editor (flip the checkbox) before they show up for other visitors. If you'd
+ * rather they appear instantly with no moderation, change that default to true.
+ * Already have this schema without article_id from an earlier version? Run:
+ *   alter table likes add column article_id text not null default 'ml-fundamentals';
+ *   alter table comments add column article_id text not null default 'ml-fundamentals';
+ *   alter table likes drop constraint likes_section_id_email_key;
+ *   alter table likes add unique (article_id, section_id, email);
+ * ======================================================================== */
+(function(){
+  var CONFIGURED = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY &&
+    CONFIG.SUPABASE_URL.indexOf('supabase.co')!==-1 && CONFIG.SUPABASE_ANON_KEY.indexOf('YOUR_')!==0);
+  var sb=null;
+
+  function initClient(){
+    if(!CONFIGURED || !window.supabase || sb) return;
+    sb=window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    loadLikeCounts(); loadComments();
+  }
+  window.__sbReady=initClient;
+
+  var LS_EMAIL='downhill_email', LS_NAME='downhill_name';
+  function getIdentity(){
+    try{ var e=localStorage.getItem(LS_EMAIL); return e?{email:e,name:localStorage.getItem(LS_NAME)||''}:null; }
+    catch(err){ return null; }
+  }
+  function saveIdentity(email,name){
+    try{ localStorage.setItem(LS_EMAIL,email); localStorage.setItem(LS_NAME,name||''); }catch(err){}
+  }
+
+  var pendingAction=null;
+  function openModal(action){
+    pendingAction=action;
+    el('mErr').textContent='';
+    el('emailModalBg').removeAttribute('hidden');
+    el('mEmail').focus();
+  }
+  function closeModal(){ el('emailModalBg').setAttribute('hidden',''); pendingAction=null; }
+  on('mCancel','click',closeModal);
+  on('mContinue','click',function(){
+    var email=el('mEmail').value.trim(), name=el('mName').value.trim();
+    if(!name){ el('mErr').textContent='Please enter your name.'; return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ el('mErr').textContent='Please enter a valid email address.'; return; }
+    saveIdentity(email,name);
+    if(CONFIGURED && sb){ sb.from('subscribers').insert({email:email, article_id:CONFIG.ARTICLE_ID}).then(function(){}); }
+    var act=pendingAction; closeModal();
+    if(act) act({email:email,name:name});
+  });
+  function requireIdentity(action){
+    var id=getIdentity();
+    if(id) action(id); else openModal(action);
+  }
+
+  /* ---- likes ---- */
+  function renderLikeButtons(){
+    var secs=document.querySelectorAll('section.chapter[id^="s"]');
+    for(var i=0;i<secs.length;i++){
+      var sec=secs[i], h2=sec.querySelector('h2'); if(!h2) continue;
+      var btn=document.createElement('button');
+      btn.type='button'; btn.className='likebtn'; btn.setAttribute('data-sec',sec.id);
+      btn.innerHTML='<span class="hrt">🤍</span><span class="cnt">0</span> like this section';
+      h2.insertAdjacentElement('afterend', btn);
+      (function(btn,secId){
+        btn.addEventListener('click',function(){
+          if(btn.classList.contains('liked')) return;
+          requireIdentity(function(id){ doLike(secId,btn,id); });
+        });
+      })(btn,sec.id);
+    }
+  }
+  function doLike(sectionId,btn,id){
+    btn.classList.add('liked');
+    btn.querySelector('.hrt').textContent='❤';
+    var cnt=btn.querySelector('.cnt');
+    cnt.textContent=(parseInt(cnt.textContent,10)||0)+1;
+    try{ localStorage.setItem('downhill_liked_'+sectionId,'1'); }catch(e){}
+    if(CONFIGURED && sb){
+      sb.from('likes').insert({article_id:CONFIG.ARTICLE_ID, section_id:sectionId, email:id.email}).then(function(res){
+        if(res && res.error && !/duplicate/i.test(res.error.message||'')) console.warn('like failed', res.error);
+      });
+    }
+  }
+  function restoreLikedState(){
+    var btns=document.querySelectorAll('.likebtn');
+    for(var i=0;i<btns.length;i++){
+      var sid=btns[i].getAttribute('data-sec');
+      try{
+        if(localStorage.getItem('downhill_liked_'+sid)==='1'){
+          btns[i].classList.add('liked'); btns[i].querySelector('.hrt').textContent='❤';
+        }
+      }catch(e){}
+    }
+  }
+  function loadLikeCounts(){
+    if(!(CONFIGURED && sb)) return;
+    sb.from('likes').select('section_id').eq('article_id',CONFIG.ARTICLE_ID).then(function(res){
+      if(!res||res.error||!res.data) return;
+      var counts={};
+      for(var i=0;i<res.data.length;i++){ var s=res.data[i].section_id; counts[s]=(counts[s]||0)+1; }
+      var btns=document.querySelectorAll('.likebtn');
+      for(var j=0;j<btns.length;j++){
+        var sid=btns[j].getAttribute('data-sec');
+        btns[j].querySelector('.cnt').textContent = counts[sid]||0;
+      }
+    });
+  }
+
+  /* ---- comments ---- */
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function renderComment(c){
+    var div=document.createElement('div'); div.className='ccard';
+    var name=(c.name && c.name.length) ? escapeHtml(c.name) : 'Anonymous';
+    div.innerHTML='<div class="cname">'+name+'</div><div class="cbody">'+escapeHtml(c.body)+'</div>';
+    return div;
+  }
+  function loadComments(){
+    if(!(CONFIGURED && sb)) return;
+    sb.from('comments').select('name,body,created_at').eq('article_id',CONFIG.ARTICLE_ID).eq('section_id','general').eq('approved',true)
+      .order('created_at',{ascending:false}).then(function(res){
+        if(!res||res.error||!res.data) return;
+        var list=el('cList'); list.innerHTML='';
+        for(var i=0;i<res.data.length;i++) list.appendChild(renderComment(res.data[i]));
+      });
+  }
+  on('cSubmit','click',function(){
+    var body=el('cBody').value.trim();
+    if(!body){ el('cStatus').textContent='Write something first.'; return; }
+    requireIdentity(function(id){
+      el('cStatus').textContent='Posting…';
+      var localC={name:id.name,body:body};
+      if(CONFIGURED && sb){
+        sb.from('comments').insert({article_id:CONFIG.ARTICLE_ID, section_id:'general', email:id.email, name:id.name, body:body}).then(function(res){
+          if(res && res.error){ el('cStatus').textContent='Could not post — please try again.'; return; }
+          el('cList').insertBefore(renderComment(localC), el('cList').firstChild);
+          el('cBody').value='';
+          el('cStatus').textContent='Posted — it\'ll appear for other visitors after a quick review.';
+        });
+      } else {
+        el('cList').insertBefore(renderComment(localC), el('cList').firstChild);
+        el('cBody').value='';
+        el('cStatus').textContent='Posted on this screen only — backend not configured yet, see setup notes above.';
+      }
+    });
+  });
+
+  if(!CONFIGURED){ var note=el('commentsConfigNote'); if(note) note.removeAttribute('hidden'); }
+  renderLikeButtons();
+  restoreLikedState();
+  if(CONFIGURED && window.supabase) initClient();
+})();
+
+/* =============== KaTeX rendering with plain-text fallback =============== */
+window.__texReady=function(){
+  if(!window.katex) return;
+  var els=document.querySelectorAll('[data-tex]');
+  for(var i=0;i<els.length;i++){
+    try{
+      window.katex.render(els[i].getAttribute('data-tex'), els[i],
+        {throwOnError:false, displayMode:els[i].getAttribute('data-disp')==='1'});
+    }catch(e){ /* keep unicode fallback text */ }
+  }
+};
+if(window.katex) window.__texReady();
+
+/* =============== S1: candidate lines =============== */
+(function(){
+  var cv=el('cv1'); if(!cv) return;
+  var p=new Plot(cv,{xmin:0,xmax:3.6,ymin:0,ymax:9,xticks:[1,2,3],yticks:[2,4,6,8],
+    xlabel:'size (100s sq ft)',ylabel:'price ($10,000s)'});
+  var cands=[{w:0.5,b:0,n:'ŷ = 0.5x + 0 — far too flat'},
+             {w:1,b:3,n:'ŷ = 1x + 3 — starts too high, climbs too little'},
+             {w:3,b:-1,n:'ŷ = 3x − 1 — too steep'},
+             {w:1.5,b:2,n:'ŷ = 1.5x + 2 — close, but tilted wrong'},
+             {w:2,b:1,n:'ŷ = 2x + 1 — the best fit: it passes through every point'}];
+  var hi=4, label=el('cand-label');
+  function draw(){
+    p.frame();
+    for(var i=0;i<cands.length;i++){
+      var c=cands[i], best=(i===4);
+      p.fn(function(x){return c.w*x+c.b;}, i===hi?(best?C.truth:C.model):C.hair, i===hi?3.5:2, best&&i!==hi?[6,6]:[]);
+    }
+    p.dataDots();
+    if(label){ label.textContent='Candidate '+(hi+1)+' of 5:  '+cands[hi].n+(hi===4?'  ✓ loss = 0':''); }
+  }
+  register(p,draw);
+  if(!reduced){ setInterval(function(){ hi=(hi+1)%cands.length; draw(); },1800); }
+})();
+
+/* =============== S2: model knobs =============== */
+(function(){
+  var cv=el('cv2'); if(!cv) return;
+  var p=new Plot(cv,{xmin:0,xmax:3.6,ymin:-2,ymax:9,xticks:[1,2,3],yticks:[0,2,4,6,8],
+    xlabel:'size x',ylabel:'price'});
+  var sw=el('w2'), sb=el('b2');
+  function vals(){ return [parseFloat(sw.value), parseFloat(sb.value)]; }
+  function draw(){
+    var v=vals(), w=v[0], b=v[1];
+    p.frame();
+    p.fn(function(x){return 2*x+1;}, C.hair, 1.5, [5,6]);
+    p.fn(function(x){return w*x+b;}, C.model, 3.5);
+    p.dot(0,b,5,C.ink,'#fff');
+    if(p.ctx){ p.ctx.font='11px "IBM Plex Mono",monospace'; p.ctx.fillStyle=C.soft;
+      p.ctx.textAlign='left'; p.ctx.fillText('b lifts this end', p.X(0)+10, p.Y(b)-10); }
+    p.dataDots();
+    el('w2v').textContent=fmt(w,1); el('b2v').textContent=fmt(b,1);
+    el('eq2').textContent='ŷ = '+fmt(w,1)+'·x + '+fmt(b,1)+'      (at x = 2:  ŷ = '+fmt(w,1)+'×2 + '+fmt(b,1)+' = '+fmt(w*2+b,1)+')';
+  }
+  sw.addEventListener('input',draw); sb.addEventListener('input',draw);
+  var btns=document.querySelectorAll('[data-preset2]');
+  for(var i=0;i<btns.length;i++)(function(btn){
+    btn.addEventListener('click',function(){
+      var q=btn.getAttribute('data-preset2').split(',');
+      var w0=parseFloat(sw.value), b0=parseFloat(sb.value);
+      animateNum(0,1,600,function(t){
+        sw.value=w0+(parseFloat(q[0])-w0)*t; sb.value=b0+(parseFloat(q[1])-b0)*t; draw();
+      });
+    });
+  })(btns[i]);
+  register(p,draw);
+})();
+
+/* =============== S2: admissions analogy =============== */
+(function(){
+  var A=[9.5,9.0,3.0], B=[7.0,7.0,9.5];
+  var schemes={acad:{w:[0.6,0.35,0.05],name:'Academic-focused'}, hol:{w:[0.3,0.2,0.5],name:'Holistic'}};
+  var barA=el('barA'), barB=el('barB'); if(!barA) return;
+  function score(st,w){ return st[0]*w[0]+st[1]*w[1]+st[2]*w[2]; }
+  function show(key){
+    var s=schemes[key], sa=score(A,s.w), sb2=score(B,s.w);
+    barA.style.width=(sa*10)+'%'; barA.textContent=fmt(sa,2);
+    barB.style.width=(sb2*10)+'%'; barB.textContent=fmt(sb2,2);
+    el('winA').textContent = sa>sb2 ? '🏆 admitted' : '';
+    el('winB').textContent = sb2>sa ? '🏆 admitted' : '';
+    el('breakdown').textContent = s.name+':  Score(A) = '+s.w[0]+'('+A[0]+') + '+s.w[1]+'('+A[1]+') + '+s.w[2]+'('+A[2]+') = '+fmt(sa,2)
+      +'    ·    Score(B) = '+s.w[0]+'('+B[0]+') + '+s.w[1]+'('+B[1]+') + '+s.w[2]+'('+B[2]+') = '+fmt(sb2,2);
+    el('schemeA').className = key==='acad' ? 'btn' : 'btn ghost';
+    el('schemeB').className = key==='hol' ? 'btn' : 'btn ghost';
+  }
+  on('schemeA','click',function(){show('acad');});
+  on('schemeB','click',function(){show('hol');});
+  setTimeout(function(){show('acad');},400);
+})();
+
+/* =============== S3: loss demo with squares =============== */
+(function(){
+  var cv=el('cv3'); if(!cv) return;
+  var p=new Plot(cv,{xmin:0,xmax:3.8,ymin:-2,ymax:9,xticks:[1,2,3],yticks:[0,2,4,6,8],
+    xlabel:'size x',ylabel:'price'});
+  var sw=el('w3'), sb=el('b3');
+  function draw(){
+    var w=parseFloat(sw.value), b=parseFloat(sb.value);
+    p.frame();
+    var i, rows='';
+    var x2=p.ctx;
+    for(i=0;i<N;i++){
+      var yh=predict(w,b,DX[i]), e=yh-DY[i];
+      if(x2){
+        var px=p.X(DX[i]), py1=p.Y(DY[i]), py2=p.Y(yh);
+        var side=Math.abs(py2-py1);
+        if(side>1){
+          x2.fillStyle='rgba(213,72,77,0.13)';
+          x2.strokeStyle='rgba(213,72,77,0.5)';
+          x2.setLineDash([4,4]); x2.lineWidth=1.2;
+          x2.fillRect(px, Math.min(py1,py2), Math.min(side, p.W-px-4), side);
+          x2.strokeRect(px, Math.min(py1,py2), Math.min(side, p.W-px-4), side);
+          x2.setLineDash([]);
+        }
+      }
+      p.seg(DX[i],DY[i],DX[i],yh,C.err,3);
+    }
+    p.fn(function(x){return w*x+b;}, C.model, 3.5);
+    p.dataDots();
+    for(i=0;i<N;i++){ p.dot(DX[i],predict(w,b,DX[i]),4,C.model,'#fff'); }
+    var L=loss(w,b), sqsum=0, terms=[];
+    rows='';
+    for(i=0;i<N;i++){
+      var yh2=predict(w,b,DX[i]), e2=yh2-DY[i]; sqsum+=e2*e2; terms.push(fmt(e2*e2,2));
+      rows+='<tr><td>#'+(i+1)+'</td><td>'+DX[i]+'</td><td>'+DY[i]+'</td><td>'+fmt(yh2,2)+'</td><td>'+(e2>=0?'+':'')+fmt(e2,2)+'</td><td>'+fmt(e2*e2,2)+'</td></tr>';
+    }
+    el('ptable').innerHTML=rows;
+    el('mse3').textContent=fmt(L,2);
+    el('msemath').textContent='L = (1/3)·('+terms.join(' + ')+') = (1/3)·('+fmt(sqsum,2)+') = '+fmt(L,2);
+    el('w3v').textContent=fmt(parseFloat(sw.value),1); el('b3v').textContent=fmt(parseFloat(sb.value),1);
+    var box=el('msebox');
+    box.className='big-metric '+(L<0.05?'good':(L>8?'bad':''));
+  }
+  sw.addEventListener('input',draw); sb.addEventListener('input',draw);
+  var btns=document.querySelectorAll('[data-preset3]');
+  for(var i=0;i<btns.length;i++)(function(btn){
+    btn.addEventListener('click',function(){
+      var q=btn.getAttribute('data-preset3').split(',');
+      var w0=parseFloat(sw.value), b0=parseFloat(sb.value);
+      animateNum(0,1,700,function(t){
+        sw.value=w0+(parseFloat(q[0])-w0)*t; sb.value=b0+(parseFloat(q[1])-b0)*t; draw();
+      });
+    });
+  })(btns[i]);
+  register(p,draw);
+})();
+
+/* =============== S4: derivative hill =============== */
+(function(){
+  var cv=el('cv4'); if(!cv) return;
+  var p=new Plot(cv,{xmin:-3.2,xmax:3.2,ymin:0,ymax:10,xticks:[-3,-2,-1,0,1,2,3],yticks:[2,4,6,8],
+    xlabel:'position x',ylabel:'height f(x) = x²'});
+  var sx=el('x4');
+  function draw(){
+    var x0=parseFloat(sx.value), y0=x0*x0, m=2*x0;
+    p.frame();
+    p.fn(function(x){return x*x;}, C.data, 3);
+    p.seg(x0-1.1, y0-1.1*m, x0+1.1, y0+1.1*m, C.model, 2.5);
+    p.dot(x0,y0,7,C.model,'#fff');
+    if(p.ctx && Math.abs(m)>0.05){
+      var dir=m>0?-1:1;
+      var ax=p.X(x0)+dir*20, ay=p.Y(y0)-14;
+      var c=p.ctx; c.font='16px sans-serif'; c.textAlign='center';
+      c.fillText(dir<0?'↙':'↘', ax, ay);
+    }
+    el('x4v').textContent=fmt(x0,2);
+    var msg;
+    if(Math.abs(m)<0.06) msg='slope f′('+fmt(x0,2)+') = 2×'+fmt(x0,2)+' = '+fmt(m,2)+'  →  flat ground. You\'ve reached the bottom.';
+    else msg='slope f′('+fmt(x0,2)+') = 2×'+fmt(x0,2)+' = '+fmt(m,2)+'  →  ground tilts '+(m>0?'up to the right, so downhill is to the LEFT':'up to the left, so downhill is to the RIGHT');
+    el('slope4').textContent=msg;
+  }
+  sx.addEventListener('input',draw);
+  function step(){
+    var x0=parseFloat(sx.value), x1=x0-0.18*(2*x0);
+    animateNum(x0,x1,350,function(v){ sx.value=v; draw(); });
+  }
+  on('stepdown','click',step);
+  var walking=false;
+  on('walkdown','click',function(){
+    if(walking) return; walking=true;
+    var n=0;
+    (function loop(){
+      var x0=parseFloat(sx.value);
+      if(Math.abs(x0)<0.03||n>40){ walking=false; draw(); return; }
+      n++; var x1=x0-0.18*(2*x0);
+      animateNum(x0,x1,reduced?0:220,function(v){ sx.value=v; draw(); });
+      setTimeout(loop, reduced?30:260);
+    })();
+  });
+  register(p,draw);
+  /* chain rule pulse */
+  if(!reduced){
+    var phase=0;
+    setInterval(function(){
+      phase=(phase+1)%3;
+      var out=el('cout'), inn=el('cin'), cap=el('chaincap');
+      if(!out) return;
+      out.classList.toggle('glow-out', phase===0);
+      inn.classList.toggle('glow-in', phase===1);
+      if(cap) cap.textContent=['Step 1 — differentiate the OUTER square: 2·( … )','Step 2 — multiply by the INNER function\'s slope','Our loss is exactly this shape: outer square, inner line.'][phase];
+    },1700);
+  }
+})();
+
+/* =============== S5: gradient feel =============== */
+(function(){
+  var sw=el('w5'), sb=el('b5'); if(!sw) return;
+  function draw(){
+    var w=parseFloat(sw.value), b=parseFloat(sb.value);
+    var g=grad(w,b), gw=g[0], gb=g[1], L=loss(w,b);
+    el('w5v').textContent=fmt(w,2); el('b5v').textContent=fmt(b,2);
+    el('gwv').textContent='∂L/∂w = '+(gw>=0?'+':'')+fmt(gw,2);
+    el('gbv').textContent='∂L/∂b = '+(gb>=0?'+':'')+fmt(gb,2);
+    el('mse5').textContent=fmt(L,3);
+    function bar(id,dirId,g,name){
+      var f=el(id), len=Math.min(Math.abs(g),24)/24*50;
+      if(g<=0){ f.style.left='50%'; f.style.width=len+'%'; }
+      else { f.style.left=(50-len)+'%'; f.style.width=len+'%'; }
+      var d=el(dirId);
+      if(Math.abs(g)<0.02) d.textContent='· flat — leave '+name+' alone';
+      else d.textContent = g<0 ? '→ nudge '+name+' UP' : '← nudge '+name+' DOWN';
+    }
+    bar('gwbar','gwdir',gw,'w'); bar('gbbar','gbdir',gb,'b');
+  }
+  sw.addEventListener('input',draw); sb.addEventListener('input',draw);
+  on('gstep','click',function(){
+    var w=parseFloat(sw.value), b=parseFloat(sb.value), g=grad(w,b);
+    var w1=w-0.1*g[0], b1=b-0.1*g[1];
+    w1=Math.max(-1,Math.min(4,w1)); b1=Math.max(-2,Math.min(4,b1));
+    animateNum(0,1,550,function(t){ sw.value=w+(w1-w)*t; sb.value=b+(b1-b)*t; draw(); });
+  });
+  draw();
+  /* feature scale bars: sqrt-compressed so both are visible */
+  var f1=el('fbar1'), f2=el('fbar2');
+  if(f1){
+    setTimeout(function(){
+      f1.style.width='96%';
+      f2.style.width=Math.max(2, Math.sqrt(30)/Math.sqrt(20000)*96)+'%';
+    },500);
+  }
+})();
+
+/* =============== S6: learning-rate trio =============== */
+(function(){
+  var defs=[{cv:'cv6a',st:'st6a',a:0.02},{cv:'cv6b',st:'st6b',a:0.35},{cv:'cv6c',st:'st6c',a:1.15}];
+  var cells=[], anyMissing=false;
+  defs.forEach(function(d){
+    var c=el(d.cv); if(!c){ anyMissing=true; return; }
+    var p=new Plot(c,{xmin:-1.4,xmax:5.4,ymin:0,ymax:10,xticks:[0,2,4],yticks:[],padL:10,padR:10,padB:18,padT:8});
+    cells.push({p:p,a:d.a,st:el(d.st),w:-0.8,trail:[],timer:null,steps:0,done:''});
+  });
+  if(anyMissing&&!cells.length) return;
+  function g(w){ return (w-2)*(w-2); }
+  function drawCell(c){
+    c.p.frame();
+    c.p.fn(g, C.data, 2.5);
+    c.p.dot(2,0,4,C.truth,'#fff');
+    var i;
+    for(i=0;i<c.trail.length-1;i++){
+      c.p.seg(c.trail[i], g(c.trail[i]), c.trail[i+1], g(c.trail[i+1]), 'rgba(255,107,53,0.55)',1.5);
+    }
+    for(i=0;i<c.trail.length;i++){
+      var vw=Math.max(-1.4,Math.min(5.4,c.trail[i]));
+      c.p.dot(vw, Math.min(10,g(c.trail[i])), 3, 'rgba(255,107,53,.45)');
+    }
+    var cw=Math.max(-1.4,Math.min(5.4,c.w));
+    c.p.dot(cw, Math.min(10,g(c.w)), 6, C.model, '#fff');
+  }
+  function drawAll(){ cells.forEach(drawCell); }
+  cells.forEach(function(c){ register(c.p, function(){ drawCell(c); }); });
+  function run(){
+    cells.forEach(function(c){
+      if(c.timer) clearInterval(c.timer);
+      c.w=-0.8; c.trail=[c.w]; c.steps=0; c.done='';
+      c.st.textContent='step 0 — L = '+fmt(g(c.w),2); c.st.className='status';
+      var period = reduced?40:300;
+      c.timer=setInterval(function(){
+        var slope=2*(c.w-2);
+        c.w = c.w - c.a*slope;
+        c.trail.push(c.w); c.steps++;
+        if(c.trail.length>60) c.trail.shift();
+        drawCell(c);
+        if(Math.abs(c.w-2)<0.015){
+          clearInterval(c.timer);
+          c.st.textContent='converged in '+c.steps+' steps ✓'; c.st.className='status ok';
+        } else if(Math.abs(c.w-2)>3.6){
+          clearInterval(c.timer);
+          c.st.textContent='diverged after '+c.steps+' steps ✗ — each bounce overshoots further'; c.st.className='status no';
+        } else if(c.steps>=90){
+          clearInterval(c.timer);
+          c.st.textContent='90 steps and still crawling… (it would get there, eventually)'; c.st.className='status no';
+        } else {
+          c.st.textContent='step '+c.steps+' — L = '+fmt(g(c.w),2);
+        }
+      }, period);
+    });
+  }
+  on('runlr','click',run);
+  drawAll();
+})();
+
+/* =============== S7: loop diagram highlight =============== */
+(function(){
+  var nodes=[el('ln0'),el('ln1'),el('ln2'),el('ln3')];
+  if(!nodes[0]) return;
+  var k=0;
+  function lite(i){ for(var j=0;j<4;j++) nodes[j].classList.toggle('lit', j===i); }
+  lite(0);
+  if(!reduced) setInterval(function(){ k=(k+1)%4; lite(k); },1100);
+  window.__loopLite=lite;
+})();
+
+/* =============== S7-8: the training player =============== */
+(function(){
+  var cvL=el('cv8line'), cvC=el('cv8loss'); if(!cvL) return;
+  var pl=new Plot(cvL,{xmin:0,xmax:3.6,ymin:0,ymax:9,xticks:[1,2,3],yticks:[2,4,6,8],xlabel:'size x',ylabel:'price'});
+  var pc=new Plot(cvC,{xmin:0,xmax:40,ymin:-8,ymax:2,xticks:[0,10,20,30,40],yticks:[],xlabel:'iteration',ylabel:'loss (log scale)',padL:52});
+  var T={w:0,b:0,iter:0,hist:[],playing:false,timer:null,speed:1};
+  var MAXIT=40;
+  function logL(L){ return Math.log10(Math.max(L,1e-8)); }
+  function drawLine(){
+    pl.frame();
+    pl.fn(function(x){return 2*x+1;}, C.truth, 1.5, [5,6]);
+    pl.fn(function(x){return T.w*x+T.b;}, C.model, 3.5);
+    pl.dataDots();
+    if(pl.ctx){ pl.ctx.font='11px "IBM Plex Mono",monospace'; pl.ctx.fillStyle=C.truth;
+      pl.ctx.textAlign='left'; pl.ctx.fillText('target y = 2x + 1', pl.X(0.15), pl.Y(8.5)); }
+  }
+  function drawCurve(){
+    pc.frame();
+    var x=pc.ctx; if(x){
+      var ticks=[[1,'10'],[0,'1'],[-2,'0.01'],[-4,'0.0001'],[-6,'10⁻⁶']];
+      x.font='10px "IBM Plex Mono",monospace'; x.fillStyle=C.soft; x.textAlign='right';
+      x.strokeStyle=C.hair2;
+      ticks.forEach(function(t){
+        var py=pc.Y(t[0]);
+        x.beginPath(); x.moveTo(pc.X(0),py); x.lineTo(pc.X(40),py); x.stroke();
+        x.fillText(t[1], pc.padL-6, py+3);
+      });
+    }
+    if(T.hist.length>1 && pc.ctx){
+      var c=pc.ctx; c.beginPath();
+      for(var i=0;i<T.hist.length;i++){
+        var px=pc.X(T.hist[i].it), py=pc.Y(logL(T.hist[i].L));
+        if(i===0)c.moveTo(px,py); else c.lineTo(px,py);
+      }
+      c.strokeStyle=C.err; c.lineWidth=2.5; c.lineJoin='round'; c.stroke();
+    }
+    if(T.hist.length){ var h=T.hist[T.hist.length-1]; pc.dot(h.it, logL(h.L), 5, C.err, '#fff'); }
+  }
+  function readouts(){
+    el('titer').textContent=T.iter;
+    el('tw').textContent=fmt(T.w,3);
+    el('tb').textContent=fmt(T.b,3);
+    el('tloss').textContent=fmtLoss(loss(T.w,T.b));
+  }
+  function logRow(){
+    var L=loss(T.w,T.b);
+    var tr=document.createElement('tr');
+    if(T.iter<=2) tr.className='hl';
+    tr.innerHTML='<td>'+(T.iter===0?'0 (start)':T.iter)+(T.iter<=2?' 📖':'')+'</td><td>'+fmt(T.w,3)+'</td><td>'+fmt(T.b,3)+'</td><td>'+fmtLoss(L)+'</td>';
+    el('tlog').appendChild(tr);
+    var box=tr.closest('.logbox'); if(box) box.scrollTop=box.scrollHeight;
+  }
+  function arith(preW,preB){
+    var i, preds=[],errs=[];
+    for(i=0;i<N;i++){ var yh=predict(preW,preB,DX[i]); preds.push(fmt(yh,3)); errs.push(fmt(yh-DY[i],3)); }
+    var g=grad(preW,preB), L=loss(preW,preB);
+    el('tarith').textContent=
+      'Iteration '+T.iter+'  (starting from w = '+fmt(preW,3)+', b = '+fmt(preB,3)+')\n'+
+      '1 · Predict:   ŷ = ['+preds.join(', ')+']\n'+
+      '2 · Measure:   errors (ŷ−y) = ['+errs.join(', ')+']   →   L = '+fmtLoss(L)+'\n'+
+      '3 · Gradient:  ∂L/∂w = '+fmt(g[0],3)+'    ∂L/∂b = '+fmt(g[1],3)+'\n'+
+      '4 · Update:    w := '+fmt(preW,3)+' − 0.1·('+fmt(g[0],3)+') = '+fmt(T.w,3)+'\n'+
+      '               b := '+fmt(preB,3)+' − 0.1·('+fmt(g[1],3)+') = '+fmt(T.b,3);
+  }
+  function step(){
+    if(T.iter>=MAXIT || loss(T.w,T.b)<1e-7){ stop(); el('tstatus').textContent='converged — the model found ŷ ≈ 2x + 1'; return; }
+    var preW=T.w, preB=T.b, g=grad(T.w,T.b);
+    T.w-=0.1*g[0]; T.b-=0.1*g[1]; T.iter++;
+    T.hist.push({it:T.iter,L:loss(T.w,T.b)});
+    readouts(); drawLine(); drawCurve(); logRow(); arith(preW,preB);
+    if(window.__loopLite && !reduced) window.__loopLite(T.iter%4);
+    if(T.iter>=MAXIT){ stop(); el('tstatus').textContent='40 iterations done — w ≈ '+fmt(T.w,2)+', b ≈ '+fmt(T.b,2)+', still creeping toward (2, 1)'; }
+  }
+  function stop(){ T.playing=false; if(T.timer)clearInterval(T.timer); T.timer=null; el('tplay').textContent='▶ Play'; }
+  function play(){
+    if(T.playing){ stop(); return; }
+    T.playing=true; el('tplay').textContent='⏸ Pause';
+    T.timer=setInterval(step, (reduced?60:800)/T.speed);
+  }
+  function reset(){
+    stop(); T.w=0; T.b=0; T.iter=0; T.hist=[{it:0,L:loss(0,0)}];
+    el('tlog').innerHTML=''; logRow();
+    el('tarith').textContent='Press Step or Play to begin.';
+    el('tstatus').textContent='';
+    readouts(); drawLine(); drawCurve();
+  }
+  on('tplay','click',play);
+  on('tstep','click',function(){ if(!T.playing) step(); });
+  on('treset','click',reset);
+  on('tspeed','change',function(){
+    T.speed=parseFloat(el('tspeed').value);
+    if(T.playing){ clearInterval(T.timer); T.timer=setInterval(step,(reduced?60:800)/T.speed); }
+  });
+  register(pl,drawLine); register(pc,drawCurve);
+  reset();
+  window.__ML.trainerStep=step; window.__ML.trainerState=T;
+})();
+
+/* =============== S9: the bowl =============== */
+(function(){
+  var cv=el('cv9'); if(!cv) return;
+  var ctx=cv.getContext?cv.getContext('2d'):null;
+  var W2={min:-1,max:5}, B2={min:-2,max:4};
+  var mode='contour';
+  /* precompute descent path from (0,0), alpha=0.06 */
+  var path=[], w=0,b=0;
+  path.push([w,b]);
+  for(var i=0;i<80;i++){ var g=grad(w,b); w-=0.06*g[0]; b-=0.06*g[1]; path.push([w,b]); }
+  var Lmax=loss(W2.min,B2.max); /* worst corner-ish */
+  (function(){ var corners=[[W2.min,B2.min],[W2.min,B2.max],[W2.max,B2.min],[W2.max,B2.max]];
+    corners.forEach(function(c){ Lmax=Math.max(Lmax,loss(c[0],c[1])); }); })();
+  function shade(t){ /* t in 0..1 low->high */
+    var stops=[[18,63,82],[77,156,133],[238,242,230]];
+    var a,bp,p2;
+    if(t<0.5){ a=stops[0]; bp=stops[1]; p2=t*2; } else { a=stops[1]; bp=stops[2]; p2=(t-0.5)*2; }
+    return 'rgb('+Math.round(a[0]+(bp[0]-a[0])*p2)+','+Math.round(a[1]+(bp[1]-a[1])*p2)+','+Math.round(a[2]+(bp[2]-a[2])*p2)+')';
+  }
+  var Wpx=0,Hpx=0;
+  function sizeUp(){
+    var dpr=window.devicePixelRatio||1;
+    Wpx=cv.clientWidth||600; Hpx=cv.clientHeight||400;
+    cv.width=Math.round(Wpx*dpr); cv.height=Math.round(Hpx*dpr);
+    if(ctx) ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  var padL=50,padR=16,padT=14,padB=40;
+  function CX(w){ return padL+(w-W2.min)/(W2.max-W2.min)*(Wpx-padL-padR); }
+  function CY(b){ return Hpx-padB-(b-B2.min)/(B2.max-B2.min)*(Hpx-padT-padB); }
+  function drawContour(upTo){
+    if(!ctx) return;
+    ctx.clearRect(0,0,Wpx,Hpx);
+    var res=110, cw=(Wpx-padL-padR)/res, ch=(Hpx-padT-padB)/res, i,j;
+    for(i=0;i<res;i++)for(j=0;j<res;j++){
+      var vw=W2.min+(W2.max-W2.min)*(i+0.5)/res;
+      var vb=B2.min+(B2.max-B2.min)*(j+0.5)/res;
+      var t=Math.sqrt(loss(vw,vb)/Lmax); t=Math.min(1,t);
+      ctx.fillStyle=shade(t);
+      ctx.fillRect(padL+i*cw, Hpx-padB-(j+1)*ch, cw+0.6, ch+0.6);
+    }
+    /* axes labels */
+    ctx.font='11px "IBM Plex Mono",monospace'; ctx.fillStyle=C.soft;
+    ctx.textAlign='center';
+    [-1,0,1,2,3,4,5].forEach(function(v){ ctx.fillText(String(v), CX(v), Hpx-padB+16); });
+    ctx.textAlign='right';
+    [-2,-1,0,1,2,3,4].forEach(function(v){ ctx.fillText(String(v), padL-8, CY(v)+4); });
+    ctx.textAlign='right'; ctx.font='12px "Instrument Sans",sans-serif';
+    ctx.fillText('weight w →', Wpx-padR, Hpx-8);
+    ctx.save(); ctx.translate(14,padT+8); ctx.rotate(-Math.PI/2); ctx.textAlign='right';
+    ctx.fillText('bias b →',0,0); ctx.restore();
+    /* min star */
+    ctx.beginPath(); ctx.arc(CX(2),CY(1),6,0,Math.PI*2); ctx.fillStyle=C.truth; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    /* path */
+    drawPath(upTo, CX, CY, false);
+  }
+  var iso={S:0, H:0, cx:0, cy:0};
+  function P3(vw,vb){
+    var u=(vw-W2.min)/(W2.max-W2.min), v=(vb-B2.min)/(B2.max-B2.min);
+    var z=Math.min(loss(vw,vb),Lmax)/Lmax;
+    return [iso.cx+(u-v)*iso.S, iso.cy+(u+v)*iso.S*0.5 - z*iso.H];
+  }
+  function draw3d(upTo){
+    if(!ctx) return;
+    ctx.clearRect(0,0,Wpx,Hpx);
+    iso.S=Math.min(Wpx,560)*0.42; iso.H=Hpx*0.52;
+    iso.cx=Wpx/2; iso.cy=Hpx*0.62;
+    var n=24,i,j,p1,p2;
+    ctx.lineWidth=1;
+    for(i=0;i<=n;i++){
+      ctx.beginPath();
+      for(j=0;j<=n;j++){
+        var vw=W2.min+(W2.max-W2.min)*i/n, vb=B2.min+(B2.max-B2.min)*j/n;
+        p1=P3(vw,vb); if(j===0)ctx.moveTo(p1[0],p1[1]); else ctx.lineTo(p1[0],p1[1]);
+      }
+      ctx.strokeStyle='rgba(22,38,44,0.28)'; ctx.stroke();
+      ctx.beginPath();
+      for(j=0;j<=n;j++){
+        var vb2=B2.min+(B2.max-B2.min)*i/n, vw2=W2.min+(W2.max-W2.min)*j/n;
+        p2=P3(vw2,vb2); if(j===0)ctx.moveTo(p2[0],p2[1]); else ctx.lineTo(p2[0],p2[1]);
+      }
+      ctx.strokeStyle='rgba(22,38,44,0.28)'; ctx.stroke();
+    }
+    var m=P3(2,1);
+    ctx.beginPath(); ctx.arc(m[0],m[1],6,0,Math.PI*2); ctx.fillStyle=C.truth; ctx.fill();
+    ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke();
+    ctx.font='12px "Instrument Sans",sans-serif'; ctx.fillStyle=C.soft; ctx.textAlign='center';
+    ctx.fillText('the bottom of the bowl: w = 2, b = 1', m[0], m[1]+22);
+    drawPath(upTo, null, null, true);
+  }
+  function drawPath(upTo, CXf, CYf, is3d){
+    if(!ctx) return;
+    var n=Math.min(upTo,path.length-1), i, pt;
+    ctx.beginPath();
+    for(i=0;i<=n;i++){
+      pt = is3d ? P3(path[i][0],path[i][1]) : [CXf(path[i][0]), CYf(path[i][1])];
+      if(i===0)ctx.moveTo(pt[0],pt[1]); else ctx.lineTo(pt[0],pt[1]);
+    }
+    ctx.strokeStyle=C.model; ctx.lineWidth=3; ctx.lineJoin='round'; ctx.stroke();
+    for(i=0;i<=n;i+=1){
+      pt = is3d ? P3(path[i][0],path[i][1]) : [CXf(path[i][0]), CYf(path[i][1])];
+      ctx.beginPath(); ctx.arc(pt[0],pt[1], i===n?6:2.5, 0, Math.PI*2);
+      ctx.fillStyle=C.model; ctx.fill();
+      if(i===n){ ctx.strokeStyle='#fff'; ctx.lineWidth=2; ctx.stroke(); }
+    }
+    /* start marker */
+    pt = is3d ? P3(path[0][0],path[0][1]) : [CXf(path[0][0]), CYf(path[0][1])];
+    ctx.font='11px "IBM Plex Mono",monospace'; ctx.fillStyle=is3d?C.soft:'#fff'; ctx.textAlign='left';
+    ctx.fillText('start (0,0)', pt[0]+8, pt[1]-6);
+  }
+  var upTo=path.length-1, animId=null;
+  function render(){ if(mode==='contour') drawContour(upTo); else draw3d(upTo); }
+  function replay2(){
+    if(animId){ cancelAnimationFrame(animId); animId=null; }
+    if(reduced){ upTo=path.length-1; render(); return; }
+    upTo=0; render();
+    var last=null;
+    function tick(t){
+      if(last===null) last=t;
+      if(t-last>50){ upTo=Math.min(path.length-1,upTo+2); last=t; render(); }
+      if(upTo<path.length-1) animId=requestAnimationFrame(tick); else animId=null;
+    }
+    animId=requestAnimationFrame(tick);
+  }
+  on('mContour','click',function(){ mode='contour'; el('mContour').classList.add('on'); el('m3d').classList.remove('on'); render(); });
+  on('m3d','click',function(){ mode='3d'; el('m3d').classList.add('on'); el('mContour').classList.remove('on'); render(); });
+  on('replay9','click',replay2);
+  redraws.push(function(){ sizeUp(); render(); });
+  sizeUp(); render();
+  /* auto-play the descent the first time the section scrolls into view */
+  if('IntersectionObserver' in window && !reduced){
+    var io=new IntersectionObserver(function(es){
+      es.forEach(function(e){ if(e.isIntersecting){ replay2(); io.disconnect(); } });
+    },{threshold:0.3});
+    io.observe(cv);
+  }
+})();
+
+/* =============== S10: sigmoid =============== */
+(function(){
+  var cv=el('cv10'); if(!cv) return;
+  var p=new Plot(cv,{xmin:-6,xmax:6,ymin:-0.12,ymax:1.15,xticks:[-4,-2,0,2,4],yticks:[0,0.5,1],
+    xlabel:'input x',ylabel:'probability ŷ',padL:48});
+  var sw=el('w10');
+  function draw(){
+    var w=parseFloat(sw.value);
+    p.frame();
+    p.seg(-6,1,6,1,C.hair,1.5,[4,5]);
+    p.seg(-6,0.5,6,0.5,C.hair,1.5,[4,5]);
+    if(p.ctx){ p.ctx.font='11px "Instrument Sans",sans-serif'; p.ctx.fillStyle=C.soft; p.ctx.textAlign='left';
+      p.ctx.fillText('certain "yes" (1)', p.X(-5.8), p.Y(1)-6);
+      p.ctx.fillText('the 50/50 line', p.X(-5.8), p.Y(0.5)-6); }
+    p.fn(function(x){ return (w*x)/12+0.5; }, C.hair, 1.5, [2,5]);
+    p.fn(function(x){ return 1/(1+Math.exp(-(w*x))); }, C.model, 3.5);
+    el('w10v').textContent=fmt(w,2);
+  }
+  sw.addEventListener('input',draw);
+  register(p,draw);
+})();
+
+})();
+</script>
+</body>
+</html>
