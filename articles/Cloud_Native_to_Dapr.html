@@ -7,7 +7,6 @@
 <meta name="description" content="From containers and Kubernetes to the sidecar runtime that carries the cross-cutting concerns — an interactive, from-first-principles walkthrough.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
 <style>
 :root{
   --paper:#F3F6F4; --ink:#16262C; --ink-soft:#41565E; --card:#FFFFFF;
@@ -102,8 +101,6 @@ section.chapter{max-width:840px; margin:0 auto; padding:64px 20px 26px}
 .panel.mathp .tag{background:var(--side-soft); color:var(--side)}
 .panel.demo{border-left:4px solid var(--app)}
 .panel.demo .tag{background:var(--app-soft); color:var(--app)}
-.eq{font-size:19px; text-align:center; padding:10px 6px; overflow-x:auto}
-.eq-inline{white-space:nowrap}
 .glossary{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
 .chip{font-size:12.5px; background:var(--hair-2); border:1px solid var(--hair); border-radius:999px; padding:4px 12px; color:var(--ink-soft)}
 .chip b{font-family:var(--mono); font-weight:600; color:var(--ink)}
@@ -300,18 +297,6 @@ footer{max-width:840px; margin:30px auto 0; padding:34px 20px 60px; border-top:1
     <p>Think of a restaurant that only ever plans for its slowest Tuesday lunch. One food-blogger review and a queue forms out the door — no extra tables, no extra cooks, and the kitchen catches fire from a single failing burner because there's no backup ring. Cloud native is the restaurant that keeps a bank of foldable tables in the back, cross-trains every cook on every station, and can lose a burner without the dinner rush even noticing. The tables and cross-training cost something up front. That's the trade this whole article is really about.</p>
   </div>
 
-  <div class="panel mathp">
-    <span class="tag">Formalizing "always on"</span>
-    <p>"Always on" is usually promised as a number, not a feeling — an <b>availability target</b>, written as a percentage of "nines." If <span class="eq-inline" data-tex="A">A</span> is the fraction of time the system must be up over a period of length <span class="eq-inline" data-tex="T">T</span>, the downtime budget it leaves you is:</p>
-    <div class="eq" data-tex="D = (1-A)\times T">D = (1&minus;A) &times; T</div>
-    <div class="glossary">
-      <span class="chip"><b>A</b> — availability target, e.g. 0.999 for "three nines"</span>
-      <span class="chip"><b>T</b> — the period measured, here one calendar year</span>
-      <span class="chip"><b>D</b> — allowed downtime within that period</span>
-    </div>
-    <p class="note" style="margin-top:12px">This is why teams argue over a single extra "9": going from 99.9% to 99.99% doesn't sound like much, but it shrinks the whole year's allowed downtime by 10×.</p>
-  </div>
-
   <div class="panel demo">
     <span class="tag">Try it — the nines calculator</span>
     <p>Drag the target and watch how little slack each extra nine actually leaves.</p>
@@ -355,17 +340,6 @@ footer{max-width:840px; margin:30px auto 0; padding:34px 20px 60px; border-top:1
   <div class="panel analogy">
     <span class="tag">Analogy</span>
     <p>Traditional deployment is one big house with no interior walls — one messy tenant's clutter spills into everyone else's room. Virtualization builds separate houses, each with its own foundation, plumbing, and utilities, which is safe but expensive to duplicate. Containers are more like apartments in one building: separate units with locked doors (isolation), sharing the building's foundation and pipes (the host kernel) instead of each pouring their own concrete.</p>
-  </div>
-
-  <div class="panel mathp">
-    <span class="tag">Why VMs cost more per app</span>
-    <p>Each VM ships a full guest operating system alongside the app; each container shares the host kernel and ships only the app and its libraries. If <span class="eq-inline" data-tex="n">n</span> app instances each need a guest OS of size <span class="eq-inline" data-tex="g">g</span> versus one shared host kernel, the fixed overhead paid <em>per instance</em> is:</p>
-    <div class="eq" data-tex="O_{vm} = n\times g \qquad O_{ctr} \approx 0">O<sub>vm</sub> = n &times; g&nbsp;&nbsp;&nbsp;&nbsp;O<sub>ctr</sub> &asymp; 0</div>
-    <div class="glossary">
-      <span class="chip"><b>n</b> — number of running instances</span>
-      <span class="chip"><b>g</b> — size/overhead of one guest OS</span>
-      <span class="chip"><b>O</b> — total OS overhead paid across all instances</span>
-    </div>
   </div>
 
   <div class="panel demo">
@@ -427,18 +401,6 @@ footer{max-width:840px; margin:30px auto 0; padding:34px 20px 60px; border-top:1
   <div class="panel analogy">
     <span class="tag">Analogy</span>
     <p>It's like every restaurant in a chain building its own walk-in fridge, its own point-of-sale system, and its own staff-scheduling software from scratch — in whatever "language" that location happens to speak. Some franchises end up with excellent fridges and terrible scheduling software, because one team is good at refrigeration and bad at scheduling. Nobody chose that; it's just what happens when every location re-solves every problem alone.</p>
-  </div>
-
-  <div class="panel mathp">
-    <span class="tag">The polyglot tax, quantified</span>
-    <p>If an organization runs <span class="eq-inline" data-tex="N">N</span> services written across <span class="eq-inline" data-tex="L">L</span> different languages, and each of the seven building blocks needs its own port per language, the number of separate plumbing implementations that must be built and kept in sync is:</p>
-    <div class="eq" data-tex="I_{lib} = 7 \times L \qquad I_{sidecar} = 7">I<sub>lib</sub> = 7 &times; L&nbsp;&nbsp;&nbsp;&nbsp;I<sub>sidecar</sub> = 7</div>
-    <div class="glossary">
-      <span class="chip"><b>N</b> — number of services</span>
-      <span class="chip"><b>L</b> — number of distinct languages/runtimes in use</span>
-      <span class="chip"><b>I</b> — distinct plumbing implementations that must exist</span>
-    </div>
-    <p class="note" style="margin-top:12px">Notice <span data-tex="N">N</span> doesn't even appear in either formula — duplication scales with how many <em>languages</em> you support, not how many services you run. A sidecar's implementation count is flat at 7, no matter how many services or languages join later.</p>
   </div>
 
   <div class="panel demo">
@@ -561,17 +523,7 @@ metadata:
   <h3>Bindings</h3>
   <p>Bindings connect to on-premises or cloud resources — SMTP, Twilio, cloud queues, cron, webhooks — without embedding any of their SDKs in every service. An <b>input binding</b> means an external event triggers your app; an <b>output binding</b> means your app invokes an external system. Either way, a change to the external connector touches configuration, not code, in every microservice that uses it.</p>
 
-  <div class="panel mathp">
-    <span class="tag">Resiliency, quantified</span>
-    <p>A retry policy's whole point is to turn one unreliable call into several chances at a reliable outcome. If a single attempt succeeds with probability <span class="eq-inline" data-tex="p">p</span>, and the sidecar retries up to <span class="eq-inline" data-tex="k">k</span> times on failure, the probability that <em>at least one</em> of those attempts succeeds is:</p>
-    <div class="eq" data-tex="P_{success} = 1 - (1-p)^{k}">P<sub>success</sub> = 1 &minus; (1&minus;p)<sup>k</sup></div>
-    <div class="glossary">
-      <span class="chip"><b>p</b> — probability a single call succeeds</span>
-      <span class="chip"><b>k</b> — number of attempts (1 original + retries)</span>
-      <span class="chip"><b>P<sub>success</sub></b> — probability at least one attempt lands</span>
-    </div>
-    <p class="note" style="margin-top:12px">This is declarative policy the sidecar enforces — retries, timeouts to bound how long any call may wait, and circuit breaking to stop calling a dependency that's clearly down until it recovers — none of it is conditional logic scattered through your services.</p>
-  </div>
+  <p>A retry policy turns one unreliable call into several chances at a reliable outcome. This is declarative policy the sidecar enforces — retries, timeouts to bound how long any call may wait, and circuit breaking to stop calling a dependency that's clearly down until it recovers — none of it is conditional logic scattered through your services.</p>
 
   <div class="panel demo">
     <span class="tag">Try it — retries vs. reliability</span>
@@ -581,7 +533,7 @@ metadata:
       <div class="knob"><label>Retry attempts: <b id="kVal">3</b></label><input type="range" id="kSlider" min="1" max="8" step="1" value="3"></div>
     </div>
     <canvas class="plot" id="retryPlot" width="760" height="220"></canvas>
-    <div class="readout"><span>P(success) after <b id="kValR">3</b> attempts: <b class="big-metric" id="retryBig" style="font-size:20px">–</b></span></div>
+    <div class="readout"><span>Chance of success after <b id="kValR">3</b> attempts: <b class="big-metric" id="retryBig" style="font-size:20px">–</b></span></div>
   </div>
 
   <h3>Observability</h3>
@@ -741,8 +693,6 @@ metadata:
   <button id="narrFab" class="narr-fab" aria-label="Open voice narration controls" aria-expanded="false" title="Voice narration">🔊</button>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer onload="window.__sbReady && window.__sbReady()"></script>
 <script>
 var CONFIG = { SUPABASE_URL:'YOUR_SUPABASE_URL', SUPABASE_ANON_KEY:'YOUR_SUPABASE_ANON_KEY', ARTICLE_ID:'cloud-native-to-dapr' };
@@ -754,20 +704,6 @@ var CSS = getComputedStyle(document.documentElement);
 function col(name){ return CSS.getPropertyValue(name).trim() || '#000'; }
 var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:col('--hair-2'),
           app:col('--app'), side:col('--side'), infra:col('--infra'), err:col('--err'), amber:col('--amber') };
-
-/* ---------------- KaTeX render with plain-text fallback ---------------- */
-(function(){
-  function renderAll(){
-    if(!window.katex){ return; }
-    document.querySelectorAll('.eq, .eq-inline').forEach(function(node){
-      var tex = node.getAttribute('data-tex'); if(!tex) return;
-      try{
-        katex.render(tex, node, { throwOnError:false, displayMode: node.classList.contains('eq') });
-      }catch(e){ /* leave plain-unicode fallback text already in the node */ }
-    });
-  }
-  if(window.katex){ renderAll(); } else { window.addEventListener('load', renderAll); setTimeout(renderAll, 800); }
-})();
 
 /* ---------------- scroll reveal + rail highlight + topbar meter ---------------- */
 (function(){
@@ -1108,7 +1044,7 @@ var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:co
     s2:"This section's the history of isolation — bare metal, then virtual machines with a full guest operating system each, then containers sharing one kernel. Drag that instance slider on the overhead chart and watch the VM line climb while the container line barely moves — that gap is exactly why containers won. And go ahead, click one of those pods below — killing it shows you Kubernetes doing its actual job, noticing and replacing it without anyone paging on-call.",
     s3:"Here's the problem Kubernetes doesn't solve: every service still needs the same seven things — discovery, state, messaging, secrets, bindings, resiliency, observability — and traditionally that means baking a framework library into each one, per language. Play with the services and languages sliders on the tax chart — notice the number of services barely matters, it's the language count that multiplies your pain.",
     s4:"This is the turn — Dapr pulls those seven things out of your code entirely and runs them as a separate process next to your app, in the same pod. Try swapping the backend in the demo below — Redis, Postgres, MySQL — and watch that only the YAML changes. Your application code, the part that actually matters, never moves.",
-    s5:"Five of these are APIs you call directly, and two — resiliency and observability — just happen underneath everything else because traffic already passes through the sidecar. The retry math here is worth sitting with: even a flaky dependency that only works seventy percent of the time gets you into the high nineties after a handful of automatic retries. Try dragging both sliders and watch how fast that curve bends toward reliable.",
+    s5:"Five of these are APIs you call directly, and two — resiliency and observability — just happen underneath everything else because traffic already passes through the sidecar. Even a flaky dependency that only works seventy percent of the time on its own gets you into the high nineties after a handful of automatic retries. Try dragging both sliders below and watch how fast that curve bends toward reliable.",
     s6:"This is where it gets concrete — two real services, Employee and Department, each with its own sidecar, running on Kubernetes. Hit play on the step-through demo and watch a single request actually cross from one service to the other — mTLS, retries, tracing, all without either app writing a line of networking code. The URL builder below shows you the actual shape of a Dapr call if you want to try this yourself later.",
     s7:"So — quick recap. Cloud native sets the bar, Kubernetes runs the containers but stops at the container boundary, the old shared-library approach taxes you per language, and Dapr's sidecar removes all three problems by moving the plumbing next door instead of inside. If you want to go build this yourself, the docs and quickstarts are linked right below.",
     comments:"That's the whole walkthrough. If something didn't click, or you want to talk through how this fits your own Kubernetes setup, drop a comment below — I'll read it."
