@@ -101,17 +101,14 @@ footer{border-top:1px dashed var(--hair); padding:40px 0 50px; margin-top:30px}
   </footer>
 </div>
 
+<script src="assets/config.js"></script>
 <script>
 (function(){
 'use strict';
-/* =============== SETUP: same Supabase project as your articles =============== *
- * Paste the same URL + anon key you used in each article's <script> CONFIG so
- * the newsletter signup here writes to the same "subscribers" table.
+/* =============== SETUP: Supabase credentials now live in assets/config.js ===== *
+ * Fill them in once there — this page and every article reuse the same values.
  * ================================================================================ */
-var CONFIG = {
-  SUPABASE_URL: 'https://gmcbnnsgpqvboatqjszb.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_ta8TNaIyn-0XHyqn3Cfh7A_iQ2sgvFu'
-};
+var CONFIG = window.CONFIG_SHARED || { SUPABASE_URL:'https://gmcbnnsgpqvboatqjszb.supabase.co', SUPABASE_ANON_KEY:'sb_publishable_ta8TNaIyn-0XHyqn3Cfh7A_iQ2sgvFu' };
 var CONFIGURED = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY &&
   CONFIG.SUPABASE_URL.indexOf('supabase.co')!==-1 && CONFIG.SUPABASE_ANON_KEY.indexOf('YOUR_')!==0);
 var sb=null;
@@ -136,10 +133,10 @@ var ARTICLES=[
     date:'2026-07-03',
     path:'articles/ml-fundamentals.html'
   },
-    {
-    slug:'ml-fundamentals',
-    title:'Cloud Native - Dapr',
-    tagline:'Cloud Native Application Architecture With Dapr',
+  {
+    slug:'Cloud Native with Dapr',
+    title:'Cloud Native Development with Dapr',
+    tagline:'Cloud Native Development with Dapr.',
     category:'Cloud',
     accent:'#FF6B35',
     minutes:35,
@@ -202,7 +199,7 @@ el('nlBtn').addEventListener('click',function(){
     });
   } else {
     el('nlEmail').value='';
-    el('nlStatus').textContent='Saved on this screen only — backend not configured yet (see CONFIG at the top of this file).';
+    el('nlStatus').textContent='Saved on this screen only — backend not configured yet (see assets/config.js).';
   }
 });
 
