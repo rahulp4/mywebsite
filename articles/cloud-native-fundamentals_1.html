@@ -1,0 +1,988 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cloud Native Applications — from First Principles | Groundwork</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="./groundwork-config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer onload="window.__sbReady && window.__sbReady()"></script>
+<style>
+:root{
+  --paper:#F3F6F4; --ink:#16262C; --ink-soft:#41565E; --card:#FFFFFF;
+  --hair:#D9E2DC; --hair-2:#E7EEE9;
+  --r:14px; --shadow:0 1px 2px rgba(22,38,44,.05), 0 8px 24px rgba(22,38,44,.06);
+  --disp:"Bricolage Grotesque", system-ui, sans-serif;
+  --body:"Instrument Sans", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, monospace;
+
+  /* Cloud-Native accents: a shipping-port palette. Each colour = one recurring idea. */
+  --scale:#D9720B; --scale-soft:#FBE4C6;      /* Elasticity & Scalability — how much the port grows/shrinks */
+  --resilient:#1C7C54; --resilient-soft:#D7EEE0; /* Resiliency & No-downtime — the port keeps working */
+  --micro:#2F5C8A; --micro-soft:#DCE7F2;       /* Independence & Microservices — each container, its own crate */
+  --secure:#8B2E3D; --secure-soft:#F3DEE1;     /* Security — the lock on the gate */
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--paper); color:var(--ink); font-family:var(--body);
+  font-size:17px; line-height:1.65; -webkit-font-smoothing:antialiased;
+}
+h1,h2,h3{font-family:var(--disp); letter-spacing:-0.01em; margin:0 0 .4em}
+a{color:var(--micro)}
+.wrap{max-width:760px; margin:0 auto; padding:0 22px}
+
+/* Top load bar — the "we're at N% dock capacity" progress bar */
+#loadbar-track{position:fixed; top:0; left:0; width:100%; height:4px; background:var(--hair-2); z-index:50}
+#loadbar{height:100%; width:0%; background:linear-gradient(90deg,var(--scale),var(--resilient)); transition:width .08s linear}
+
+#topbar{
+  position:sticky; top:4px; z-index:40; background:rgba(243,246,244,.88); backdrop-filter:blur(6px);
+  border-bottom:1px solid var(--hair); padding:10px 0;
+}
+#topbar .row{display:flex; align-items:center; justify-content:space-between; gap:12px}
+.backlink{font-size:14px; color:var(--ink-soft); text-decoration:none; display:inline-flex; align-items:center; gap:6px}
+.backlink:hover{color:var(--ink)}
+.dock-readout{font-family:var(--mono); font-size:12px; color:var(--ink-soft); white-space:nowrap}
+
+/* Hero */
+.hero{padding:86px 0 40px}
+.kicker{
+  font-family:var(--mono); font-size:12.5px; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--scale); font-weight:600; margin-bottom:14px; display:flex; align-items:center; gap:8px;
+}
+.kicker::before{content:"⛴"; font-size:14px}
+.hero h1{font-size:44px; font-weight:800; line-height:1.06; max-width:12ch}
+.hero .sub{font-size:19px; color:var(--ink-soft); max-width:46ch; margin-top:16px}
+@media (max-width:600px){ .hero h1{font-size:34px} }
+
+.hero-yard{margin-top:30px}
+.hero-yard svg{width:100%; height:auto; display:block}
+
+/* Section shell */
+section.s{padding:54px 0}
+section.s h2{font-size:28px; margin-bottom:6px}
+.eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.1em; text-transform:uppercase; font-weight:600; margin-bottom:8px}
+
+.panel{
+  background:var(--card); border:1px solid var(--hair); border-radius:var(--r);
+  box-shadow:var(--shadow); padding:22px 24px; margin:18px 0;
+}
+.panel.analogy{border-left:4px solid var(--scale)}
+.panel.demo{border-left:4px solid var(--micro)}
+.panel .tag{font-family:var(--mono); font-size:11px; text-transform:uppercase; letter-spacing:.08em; color:var(--ink-soft); margin-bottom:8px; display:block}
+
+.eq{overflow-x:auto; padding:10px 4px; font-size:1.08em}
+.eq-inline{font-size:1em}
+.glossary{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+.chip{
+  background:var(--hair-2); border-radius:999px; padding:5px 12px; font-size:13px;
+  font-family:var(--mono); color:var(--ink-soft); display:inline-flex; gap:6px; align-items:center;
+}
+.chip b{color:var(--ink); font-family:var(--body); font-weight:600}
+
+.controls{display:flex; flex-wrap:wrap; gap:16px; align-items:center; margin:14px 0}
+.knob{display:flex; flex-direction:column; gap:6px; font-size:13px; color:var(--ink-soft); flex:1; min-width:180px}
+.knob input[type=range]{width:100%}
+.readout{font-family:var(--mono); font-size:13px; color:var(--ink); background:var(--hair-2); padding:2px 8px; border-radius:6px}
+.big-metric{font-family:var(--disp); font-weight:800; font-size:34px; line-height:1}
+.big-metric small{font-family:var(--body); font-weight:500; font-size:14px; color:var(--ink-soft); display:block; margin-top:2px}
+
+.btn{
+  border:1px solid var(--hair); background:var(--card); color:var(--ink); font-family:var(--body);
+  font-weight:600; font-size:14px; padding:9px 16px; border-radius:10px; cursor:pointer; transition:.15s;
+}
+.btn:hover{border-color:var(--ink-soft)}
+.btn.ghost{background:transparent}
+.btn.accent{background:var(--micro); color:#fff; border-color:var(--micro)}
+.btn.accent:hover{filter:brightness(1.08)}
+.btn:disabled{opacity:.5; cursor:not-allowed}
+
+canvas.plot{width:100%; display:block; border-radius:10px; background:#FCFDFC; border:1px solid var(--hair)}
+
+.reveal{opacity:0; transform:translateY(14px); transition:opacity .5s ease, transform .5s ease}
+.reveal.in{opacity:1; transform:none}
+
+.grid2{display:grid; grid-template-columns:1fr 1fr; gap:14px}
+@media (max-width:640px){ .grid2{grid-template-columns:1fr} }
+
+.pill-row{display:flex; gap:8px; flex-wrap:wrap; margin:10px 0}
+.pill{
+  font-family:var(--mono); font-size:12px; padding:4px 10px; border-radius:999px; font-weight:600;
+}
+.pill.scale{background:var(--scale-soft); color:var(--scale)}
+.pill.resilient{background:var(--resilient-soft); color:var(--resilient)}
+.pill.micro{background:var(--micro-soft); color:var(--micro)}
+.pill.secure{background:var(--secure-soft); color:var(--secure)}
+
+.callout{
+  border-radius:10px; padding:14px 16px; font-size:15px; margin:14px 0;
+  background:var(--hair-2); color:var(--ink-soft);
+}
+.callout b{color:var(--ink)}
+
+.summary-grid{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px}
+@media (max-width:640px){ .summary-grid{grid-template-columns:1fr} }
+.summary-card{background:var(--card); border:1px solid var(--hair); border-radius:12px; padding:16px}
+.summary-card h4{margin:0 0 6px; font-size:15px; font-family:var(--disp)}
+
+/* ---------- likes ---------- */
+.likebtn{
+  display:inline-flex; align-items:center; gap:8px; border:1.5px solid var(--hair); background:var(--card);
+  border-radius:999px; padding:7px 16px; font-family:var(--body); font-size:13.5px; font-weight:600;
+  color:var(--ink-soft); cursor:pointer; margin:2px 0 20px; transition:border-color .15s, color .15s, background .15s;
+}
+.likebtn:hover{border-color:var(--micro)}
+.likebtn.liked{border-color:var(--micro); color:var(--micro); background:var(--micro-soft); cursor:default}
+.likebtn .hrt{font-size:15px}
+/* ---------- comments ---------- */
+.ctextarea{width:100%; font-family:var(--body); font-size:14.5px; padding:11px 14px; border-radius:10px; border:1.5px solid var(--hair); resize:vertical; background:#FCFDFC}
+.ctextarea:focus{outline:none; border-color:var(--micro)}
+.clist{display:flex; flex-direction:column; gap:12px; margin-top:18px}
+.ccard{border:1px solid var(--hair-2); border-radius:10px; padding:12px 15px; background:#FCFDFC}
+.ccard .cname{font-weight:600; font-size:13.5px}
+.ccard .cbody{font-size:14px; margin-top:4px; white-space:pre-wrap; color:var(--ink)}
+/* ---------- email-capture modal ---------- */
+.modalbg{position:fixed; inset:0; background:rgba(22,38,44,.45); z-index:90; display:flex; align-items:center; justify-content:center; padding:20px}
+.modalbg[hidden]{display:none} /* <-- REQUIRED. See gotchas.md. Do not remove. */
+.modalbox{background:var(--card); border-radius:var(--r); padding:26px; width:min(370px,100%); box-shadow:var(--shadow)}
+.modalbox h4{margin:0 0 6px; font-family:var(--disp); font-weight:700; font-size:17px}
+.modalbox input{width:100%; font-family:var(--body); font-size:14.5px; padding:10px 13px; border-radius:9px; border:1.5px solid var(--hair); margin-top:10px; background:#FCFDFC}
+.modalbox input:focus{outline:none; border-color:var(--micro)}
+.btnrow{display:flex; gap:10px; flex-wrap:wrap}
+.note{font-size:13px; color:var(--ink-soft)}
+
+footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1px solid var(--hair); margin-top:40px}
+
+</style>
+</head>
+<body>
+
+<div id="loadbar-track"><div id="loadbar"></div></div>
+
+<div id="topbar">
+  <div class="wrap row">
+    <a class="backlink" href="index.html">&larr; Back to all articles</a>
+    <span class="dock-readout" id="dockReadout">DOCK LOAD · 0%</span>
+  </div>
+</div>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="kicker">Groundwork · Systems, from first principles</div>
+    <h1>Cloud Native Applications, from First Principles</h1>
+    <p class="sub">Why an app that "runs in the cloud" isn't automatically a <em>cloud native</em> app — and how containers, Kubernetes and a service mesh turn a fragile monolith into something that scales, heals and never really goes down.</p>
+    <div class="hero-yard reveal" id="heroYardWrap">
+      <svg id="heroYard" viewBox="0 0 720 200" xmlns="http://www.w3.org/2000/svg"></svg>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+<!-- ============ SECTION 1 : WHAT IS CLOUD NATIVE ============ -->
+<section class="s reveal" id="s1">
+  <div class="eyebrow" style="color:var(--micro)">01 · The idea</div>
+  <h2>Running <em>on</em> the cloud is not the same as being <em>cloud native</em></h2>
+
+  <p>Imagine you rent a flat in a modern high-rise society in Pune — one with a lift, 24×7 water backup, security guards and power backup for every floor. If you move in but keep using a diesel generator you dragged from your old bungalow, never use the lift, and store your own water in drums — you're technically "in" the building, but you're not using anything the building was built to give you.</p>
+
+  <p>That's most "cloud" apps before they become <b>cloud native</b>. A cloud native app is built, from day one, to actually use what cloud infrastructure gives you: the ability to add more servers in seconds, to survive a server dying without anyone noticing, and to update software without switching it off. It's an approach to building, deploying and running software — not tied to any one provider like AWS, Azure or GCP.</p>
+
+  <div class="callout">
+    <b>Who decides the rules?</b> The <b>Cloud Native Computing Foundation (CNCF)</b> is the neutral body — home to projects like Kubernetes, Istio and Argo — that sets the standards and hosts the open-source tools most cloud native apps are built on.
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">try it — the six things a cloud native app promises</span>
+    <p style="margin-top:0; color:var(--ink-soft); font-size:15px">Tap each promise to see the plain-language version. The rest of this article walks through how each one is actually delivered.</p>
+    <div class="pill-row" id="promisePills"></div>
+    <div id="promiseDetail" class="callout" style="min-height:56px"></div>
+  </div>
+</section>
+
+<!-- ============ SECTION 2 : ELASTICITY & SCALABILITY ============ -->
+<section class="s reveal" id="s2">
+  <div class="eyebrow" style="color:var(--scale)">02 · Elasticity &amp; Scalability</div>
+  <h2>The dock grows more berths on a busy day, and shrinks back after</h2>
+
+  <p>Picture a container port. On a normal Tuesday, 4 berths handle every ship that arrives. But right before a big festival — say, the week before Diwali — three times as many ships show up loaded with goods. A well-run port doesn't turn ships away; it opens more berths, brings in more cranes, and once the rush passes, quietly closes them again so it isn't paying for idle cranes all year.</p>
+
+  <p>An e-commerce app behaves the same way. On a normal day 4 running copies ("instances") of the checkout service are enough. During a flash sale, traffic can jump 5–10x in minutes. A cloud native app is built to notice that jump and <b>scale out</b> — add more instances automatically — and later <b>scale in</b> once the rush is over. <b>Elasticity</b> is this ability to grow and shrink; <b>scalability</b> is the ceiling on how far it can grow at all.</p>
+
+  <div class="panel demo">
+    <span class="tag">interactive — run the port yourself</span>
+    <p style="margin-top:0; color:var(--ink-soft); font-size:15px">Drag the traffic slider up to festival-sale levels and watch the port open new berths — computed live from the formula above, not pre-drawn.</p>
+    <div class="controls">
+      <div class="knob">
+        <label>Incoming traffic (R) — requests/sec: <span class="readout" id="rVal">400</span></label>
+        <input type="range" id="rSlider" min="50" max="2000" step="10" value="400">
+      </div>
+      <div class="knob" style="max-width:220px">
+        <label>Capacity per berth (C): <span class="readout" id="cVal">120</span></label>
+        <input type="range" id="cSlider" min="40" max="300" step="10" value="120">
+      </div>
+    </div>
+    <canvas class="plot" id="portCanvas" height="220"></canvas>
+    <div style="display:flex; gap:26px; margin-top:10px; flex-wrap:wrap">
+      <div class="big-metric" id="nBerthsMetric">4<small>berths open (N)</small></div>
+      <div class="big-metric" id="idleMetric">0%<small>spare capacity right now</small></div>
+    </div>
+  </div>
+</section>
+
+<!-- ============ SECTION 3 : INDEPENDENCE & MICROSERVICES ============ -->
+<section class="s reveal" id="s3">
+  <div class="eyebrow" style="color:var(--micro)">03 · Independence &amp; microservices</div>
+  <h2>One big crate vs. many small, labelled crates</h2>
+
+  <p>Old-style apps are often built as one giant program — a <b>monolith</b> — where the login page, the catalogue, the cart and the payment logic are all bundled into a single deployable unit. Change one line in the payment logic, and you have to rebuild, retest and redeploy the <em>entire</em> application.</p>
+
+  <p>A cloud native app instead breaks the same functionality into small, independent services — <b>microservices</b> — each one its own labelled crate: a "cart service", a "catalogue service", a "payment service". Each crate has its own code, its own release schedule, and can be picked up, upgraded and put back down without touching any other crate on the dock. This <b>independence</b> is what lets one team ship a payment-service fix on a Tuesday afternoon without anyone re-testing the whole website.</p>
+
+  <div class="panel analogy">
+    <span class="tag">analogy — the tiffin service, not the joint-family kitchen</span>
+    <p style="margin:0">A joint family cooking together in one kitchen (a monolith) is efficient until someone wants to change the recipe — everyone's meal is affected. A tiffin service (microservices) has separate cooks for dal, sabzi and roti; each can change their recipe, fall sick, or get replaced, without stopping the others from delivering their box on time.</p>
+  </div>
+
+  <div class="panel demo">
+    <span class="tag">interactive — click a crate to release an independent update</span>
+    <p style="margin-top:0; color:var(--ink-soft); font-size:15px">Each crate below is a microservice with its own version. Click "Ship update" on any one — notice the others don't even blink.</p>
+    <div id="crateYard" style="display:flex; gap:14px; flex-wrap:wrap; margin-top:10px"></div>
+  </div>
+</section>
+
+<!-- ============ SECTION 4 : NO DOWNTIME & IMMUTABLE INFRASTRUCTURE ============ -->
+<section class="s reveal" id="s4">
+  <div class="eyebrow" style="color:var(--resilient)">04 · No downtime &amp; immutable infrastructure</div>
+  <h2>Never repaint the ship at sea — swap it for a new one</h2>
+
+  <p>Old-school deployment logs into a running server and edits it in place: patch this file, restart that process. It works, but every such server slowly becomes a unique, hand-tweaked snowflake that's hard to reproduce — and usually needs a moment of downtime to restart.</p>
+
+  <p><b>Immutable infrastructure</b> takes the opposite approach: you never modify a running container. Instead you build a brand-new container image with the update baked in, and let it stand up <em>next to</em> the old one. Once the new one is healthy, traffic is switched over and the old one is destroyed. Kubernetes does this automatically during a <b>rolling update</b> — a few new copies come up, get proven healthy, take over traffic, and only then are the old copies retired — so there is no window where the service is "down for maintenance."</p>
+
+  <div class="panel demo">
+    <span class="tag">interactive — do a rolling update yourself</span>
+    <div class="controls">
+      <button class="btn accent" id="rollBtn">Deploy v1.1 (rolling update)</button>
+      <button class="btn ghost" id="resetRollBtn">Reset</button>
+    </div>
+    <svg id="rollSvg" viewBox="0 0 680 170" xmlns="http://www.w3.org/2000/svg" style="width:100%; margin-top:8px"></svg>
+    <p id="rollCaption" style="font-size:14px; color:var(--ink-soft); margin:8px 0 0">Currently serving: <b>App v1.0</b> on 3 instances — 0% downtime so far.</p>
+  </div>
+</section>
+
+<!-- ============ SECTION 5 : RESILIENCY ============ -->
+<section class="s reveal" id="s5">
+  <div class="eyebrow" style="color:var(--resilient)">05 · Resiliency</div>
+  <h2>One crane breaking down shouldn't shut the whole port</h2>
+
+  <p>Failures are not an edge case in distributed systems — they're a certainty. A server will die, a network link will flicker, a whole cloud region can go down for a few hours. <b>Resiliency</b> is not about preventing failure; it's about designing so that <em>one</em> failure doesn't cascade into <em>every</em> failure.</p>
+
+  <p>Concretely: if the payment microservice on an e-commerce site goes down, a resilient system doesn't crash the entire checkout page — it catches the failure (often via a pattern called a <b>circuit breaker</b>), shows a graceful "payments are temporarily delayed, please retry" message, and keeps the catalogue and cart working normally for everyone else.</p>
+
+  <div class="panel demo">
+    <span class="tag">interactive — kill a microservice and watch it isolate</span>
+    <p style="margin-top:0; color:var(--ink-soft); font-size:15px">Click Microservice C to simulate a failure, then see how the request path reacts — and how many "nines" of availability that failure pattern works out to over a year.</p>
+    <svg id="resSvg" viewBox="0 0 680 130" xmlns="http://www.w3.org/2000/svg" style="width:100%"></svg>
+    <div class="controls">
+      <div class="knob" style="max-width:260px">
+        <label>Minutes down per incident: <span class="readout" id="dMinVal">14</span></label>
+        <input type="range" id="dMinSlider" min="1" max="180" step="1" value="14">
+      </div>
+      <div class="knob" style="max-width:220px">
+        <label>Incidents per year: <span class="readout" id="incVal">6</span></label>
+        <input type="range" id="incSlider" min="0" max="60" step="1" value="6">
+      </div>
+    </div>
+    <div class="big-metric" id="availMetric">99.9997%<small>yearly availability (A)</small></div>
+  </div>
+</section>
+
+<!-- ============ SECTION 6 : SECURITY ============ -->
+<section class="s reveal" id="s6">
+  <div class="eyebrow" style="color:var(--secure)">06 · Security</div>
+  <h2>The gate matters as much as the cranes</h2>
+
+  <p>A port with the fastest cranes in the world is still useless if anyone can walk in and swap the contents of a container. Cloud native security means every microservice proves who it is before talking to another (usually via short-lived certificates, not shared passwords), every request is encrypted in transit, and traffic in and out of the cluster is checked at a clearly defined gate rather than trusted by default.</p>
+
+  <p>This matters most for e-commerce and fintech-style apps where fraud detection, payment data and personal information move between dozens of independent microservices every second — a single unguarded gate is enough to compromise the lot.</p>
+
+  <div class="callout">
+    <b>Where security actually gets enforced:</b> mostly at two layers you'll meet in the next section — the <b>ingress gate</b> at the edge of the cluster, and <b>mutual TLS</b> between microservices, handled automatically by the service mesh so individual developers don't have to hand-write it into every crate.
+  </div>
+</section>
+
+<!-- ============ SECTION 7 : CONTAINERS, KUBERNETES & SERVICE MESH ============ -->
+<section class="s reveal" id="s7">
+  <div class="eyebrow" style="color:var(--micro)">07 · How it's actually built</div>
+  <h2>Containers are the crate, Kubernetes is the port authority, the mesh is the radio channel</h2>
+
+  <p>Put the ideas above into real technology and three layers do almost all the work:</p>
+
+  <div class="grid2">
+    <div class="panel" style="border-left:4px solid var(--micro)">
+      <span class="tag">containers</span>
+      <p style="margin:0; font-size:15px">The smallest unit of compute. A container packages one microservice together with just enough of an operating system to run it — so it behaves identically on a developer's laptop, a test server, or production. <b>Docker</b> is the tool most commonly used to build and run these.</p>
+    </div>
+    <div class="panel" style="border-left:4px solid var(--scale)">
+      <span class="tag">kubernetes</span>
+      <p style="margin:0; font-size:15px">The "port authority." It decides which physical server each container runs on, restarts a container that crashes, performs rolling updates, and scales the number of copies up or down as traffic changes — all without a human clicking anything.</p>
+    </div>
+  </div>
+
+  <p>Neither of those two, on their own, manages <em>how microservices talk to each other</em> — for that, cloud native apps add a <b>service mesh</b>.</p>
+
+  <div class="panel demo">
+    <span class="tag">interactive — with and without a service mesh</span>
+    <p style="margin-top:0; color:var(--ink-soft); font-size:15px">Toggle the mesh on and off to see what changes about the path a request takes between two microservices.</p>
+    <div class="controls">
+      <button class="btn accent" id="meshToggle">Turn service mesh ON</button>
+    </div>
+    <svg id="meshSvg" viewBox="0 0 680 190" xmlns="http://www.w3.org/2000/svg" style="width:100%"></svg>
+    <p id="meshCaption" style="font-size:14px; color:var(--ink-soft); margin:8px 0 0"></p>
+  </div>
+
+  <p>A service mesh runs a lightweight <b>proxy</b> alongside every microservice. Every request quietly passes through this proxy first — which is where encryption (mTLS), retries, circuit breaking and traffic metrics all get applied consistently, without any microservice's own code having to implement them. <b>Istio</b> is the best-known example; <b>Dapr</b> offers similar capabilities and adds more building blocks for the microservice's own runtime logic too.</p>
+</section>
+
+<!-- ============ SECTION 8 : BUSINESS BENEFITS & CNCF LANDSCAPE ============ -->
+<section class="s reveal" id="s8">
+  <div class="eyebrow" style="color:var(--scale)">08 · Why a business actually cares</div>
+  <h2>Every technical promise above is really a cost argument</h2>
+
+  <p>None of elasticity, resiliency or independence survive a budget review unless they translate into money. And they do, directly: elasticity means you pay for extra capacity only during the festival-sale week, not all year; independence means smaller, faster-moving teams instead of one large team blocking each other; no-downtime deploys mean lost-sales-from-an-outage stops being a recurring line item.</p>
+
+  <p>The CNCF landscape — a large, constantly growing map of open-source projects (Kubernetes, Istio, Argo, Prometheus, OpenTelemetry, and hundreds more) — exists precisely so a team doesn't have to build any of this from scratch. The real skill isn't knowing that the landscape exists; it's picking the small subset of it that actually fits your app's requirements.</p>
+</section>
+
+<!-- ============ SUMMARY ============ -->
+<section class="s reveal" id="s9">
+  <div class="eyebrow" style="color:var(--ink-soft)">Summary</div>
+  <h2>The whole article, in one dock</h2>
+  <p>Every idea above maps to one working part of a shipping port — carry this picture forward and the jargon mostly falls away on its own.</p>
+
+  <div class="summary-grid">
+    <div class="summary-card">
+      <h4 style="color:var(--scale)">Elasticity &amp; scalability</h4>
+      <p style="margin:0; font-size:14px; color:var(--ink-soft)">Open more berths as traffic rises, close them after — automatically.</p>
+    </div>
+    <div class="summary-card">
+      <h4 style="color:var(--micro)">Independence &amp; microservices</h4>
+      <p style="margin:0; font-size:14px; color:var(--ink-soft)">Small, separately-shippable crates instead of one giant, all-or-nothing cargo hold.</p>
+    </div>
+    <div class="summary-card">
+      <h4 style="color:var(--resilient)">No downtime &amp; resiliency</h4>
+      <p style="margin:0; font-size:14px; color:var(--ink-soft)">Swap ships instead of repainting at sea; isolate failures instead of letting them cascade.</p>
+    </div>
+    <div class="summary-card">
+      <h4 style="color:var(--secure)">Security</h4>
+      <p style="margin:0; font-size:14px; color:var(--ink-soft)">Every crate proves who it is at the gate and on every internal call — usually via the mesh, not hand-written per service.</p>
+    </div>
+  </div>
+
+  <div class="callout" style="margin-top:20px">
+    <b>Common pitfall:</b> teams often lift-and-shift an old monolith onto cloud servers and call it "cloud native" because it now runs on AWS or Azure. Running <em>on</em> the cloud is necessary but not sufficient — without elasticity, independent microservices, immutable deploys and a resiliency strategy, it's just a monolith paying a cloud bill.
+  </div>
+
+  <p style="margin-top:26px; color:var(--ink-soft); font-size:15px">Next in this series: how <b>Dapr</b> extends the service-mesh idea further into the microservice's own runtime — state management, pub/sub and bindings included.</p>
+</section>
+
+</main>
+
+<div id="emailModalBg" class="modalbg" hidden>
+  <div class="modalbox">
+    <h4>One quick thing</h4>
+    <p class="note">Add your name and email so we know who's liking and commenting. We won't spam you, and this browser won't ask again.</p>
+    <input type="text" id="mName" placeholder="Name">
+    <input type="email" id="mEmail" placeholder="you@example.com">
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn accent" id="mContinue">Continue</button>
+      <button class="btn ghost" id="mCancel">Cancel</button>
+    </div>
+    <div class="note" id="mErr" style="color:var(--secure); margin-top:8px"></div>
+  </div>
+</div>
+
+<main class="wrap">
+<section id="comments" class="reveal">
+  <div class="eyebrow" style="color:var(--ink-soft)">Join the discussion</div>
+  <h2>Comments</h2>
+  <p class="note" id="commentsConfigNote" hidden>Comments and likes aren't connected to a backend yet — check groundwork-config.js. They'll still work on this screen, but won't be saved or shown to other visitors until that's done.</p>
+  <div class="panel demo">
+    <span class="tag">Leave a comment on the article</span>
+    <textarea id="cBody" class="ctextarea" rows="3" placeholder="Ask a question, share what clicked for you…"></textarea>
+    <div class="btnrow"><button class="btn accent" id="cSubmit">Post comment</button></div>
+    <div class="note" id="cStatus" style="margin-top:6px"></div>
+    <div class="clist" id="cList"></div>
+  </div>
+</section>
+</main>
+
+<footer>
+  <div class="wrap">
+    Groundwork — technical topics explained from first principles.<br>
+    Adapted from original source notes on Cloud Native Application Development.
+  </div>
+</footer>
+
+<script>
+/* ---------- utility: scroll reveal ---------- */
+(function(){
+  var els = document.querySelectorAll('.reveal');
+  var obs = new IntersectionObserver(function(entries){
+    entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); } });
+  }, {threshold:0.12});
+  els.forEach(function(el){ obs.observe(el); });
+})();
+
+/* ---------- load bar (dock capacity as you scroll) ---------- */
+(function(){
+  var bar = document.getElementById('loadbar');
+  var readout = document.getElementById('dockReadout');
+  function update(){
+    var h = document.documentElement;
+    var scrolled = h.scrollTop;
+    var max = h.scrollHeight - h.clientHeight;
+    var pct = max > 0 ? Math.min(100, Math.round((scrolled/max)*100)) : 0;
+    bar.style.width = pct + '%';
+    readout.textContent = 'DOCK LOAD · ' + pct + '%';
+  }
+  window.addEventListener('scroll', update, {passive:true});
+  update();
+})();
+
+/* ---------- small DOM helpers (used by the engagement module below) ---------- */
+function el(id){ return document.getElementById(id); }
+function on(id,ev,fn){ var e=el(id); if(e) e.addEventListener(ev,fn); }
+
+/* ---------- per-article config; SUPABASE_URL/ANON_KEY come from the shared groundwork-config.js ---------- */
+var CONFIG = Object.assign({ ARTICLE_ID: 'cloud-native-fundamentals' }, window.GROUNDWORK_CONFIG || {});
+
+/* ---------- CSS colour reader ---------- */
+var CSS_ = getComputedStyle(document.documentElement);
+function col(name){ return CSS_.getPropertyValue(name).trim() || '#000'; }
+var C = {
+  ink: col('--ink'), soft: col('--ink-soft'), hair: col('--hair'), hair2: col('--hair-2'),
+  scale: col('--scale'), scaleSoft: col('--scale-soft'),
+  resilient: col('--resilient'), resilientSoft: col('--resilient-soft'),
+  micro: col('--micro'), microSoft: col('--micro-soft'),
+  secure: col('--secure'), secureSoft: col('--secure-soft')
+};
+
+/* =========================================================
+   Hero yard SVG — a small idle port illustration
+   ========================================================= */
+(function(){
+  var svg = document.getElementById('heroYard');
+  var w = 720, h = 200;
+  var colours = [C.scale, C.micro, C.resilient, C.secure, C.scale, C.micro];
+  var html = '<rect x="0" y="0" width="'+w+'" height="'+h+'" fill="none"/>';
+  html += '<line x1="0" y1="170" x2="'+w+'" y2="170" stroke="'+C.hair+'" stroke-width="2"/>';
+  for(var i=0;i<6;i++){
+    var x = 40 + i*112;
+    var ch = 60 + (i%3)*18;
+    html += '<rect x="'+x+'" y="'+(170-ch)+'" width="86" height="'+ch+'" rx="6" fill="'+colours[i]+'" opacity="0.9"/>';
+    html += '<rect x="'+(x+8)+'" y="'+(170-ch+10)+'" width="70" height="4" rx="2" fill="rgba(255,255,255,.55)"/>';
+  }
+  svg.innerHTML = html;
+})();
+
+/* =========================================================
+   Section 1 — promise pills
+   ========================================================= */
+(function(){
+  var data = [
+    {k:'Elasticity', cls:'scale', text:'Adds capacity automatically when traffic spikes, and removes it once things calm down.'},
+    {k:'Independence', cls:'micro', text:'Each microservice ships, scales and fails on its own schedule — no coordinated "big bang" release.'},
+    {k:'No downtime', cls:'resilient', text:'Updates roll out gradually while old copies keep serving traffic, so users never see a maintenance page.'},
+    {k:'Resiliency', cls:'resilient', text:'One failing part degrades gracefully instead of taking the whole app down with it.'},
+    {k:'Security', cls:'secure', text:'Every microservice proves its identity, and every hop is encrypted — by default, not by developer discipline.'},
+    {k:'Scalability', cls:'scale', text:'There is a real, engineered ceiling for how far the app can grow — not a guess.'}
+  ];
+  var pillRow = document.getElementById('promisePills');
+  var detail = document.getElementById('promiseDetail');
+  data.forEach(function(d, idx){
+    var b = document.createElement('button');
+    b.className = 'pill ' + d.cls;
+    b.style.cursor = 'pointer';
+    b.style.border = 'none';
+    b.textContent = d.k;
+    b.addEventListener('click', function(){
+      detail.innerHTML = '<b>' + d.k + ':</b> ' + d.text;
+    });
+    pillRow.appendChild(b);
+    if(idx === 0){ detail.innerHTML = '<b>' + d.k + ':</b> ' + d.text; }
+  });
+})();
+
+/* =========================================================
+   Section 2 — elasticity port canvas, driven by N = ceil(R/C)
+   ========================================================= */
+var PortDemo = (function(){
+  var canvas = document.getElementById('portCanvas');
+  var ctx = canvas.getContext('2d');
+  var rSlider = document.getElementById('rSlider');
+  var cSlider = document.getElementById('cSlider');
+  var rVal = document.getElementById('rVal');
+  var cVal = document.getElementById('cVal');
+  var nMetric = document.getElementById('nBerthsMetric');
+  var idleMetric = document.getElementById('idleMetric');
+
+  function computeN(R, Cc){ return Math.max(1, Math.ceil(R / Cc)); }
+
+  function resize(){
+    var ratio = window.devicePixelRatio || 1;
+    var cw = canvas.clientWidth || 640;
+    canvas.width = cw * ratio;
+    canvas.height = 220 * ratio;
+    ctx.setTransform(ratio,0,0,ratio,0,0);
+    draw();
+  }
+
+  function draw(){
+    var R = parseInt(rSlider.value, 10);
+    var Cc = parseInt(cSlider.value, 10);
+    var N = computeN(R, Cc);
+    var usedCapacity = N * Cc;
+    var idlePct = Math.max(0, Math.round(((usedCapacity - R) / usedCapacity) * 100));
+
+    rVal.textContent = R;
+    cVal.textContent = Cc;
+    nMetric.innerHTML = N + '<small>berths open (N)</small>';
+    idleMetric.innerHTML = idlePct + '%<small>spare capacity right now</small>';
+
+    var cw = canvas.clientWidth || 640;
+    var chh = 220;
+    ctx.clearRect(0,0,cw,chh);
+
+    var cols = Math.min(N, 12);
+    var rows = Math.ceil(N/cols);
+    var pad = 14;
+    var gap = 8;
+    var boxW = (cw - pad*2 - gap*(cols-1)) / cols;
+    var boxH = Math.min(46, (chh - pad*2 - gap*(rows-1)) / Math.max(rows,1));
+
+    for(var i=0;i<N;i++){
+      var col = i % cols;
+      var row = Math.floor(i / cols);
+      var x = pad + col*(boxW+gap);
+      var y = pad + row*(boxH+gap);
+      ctx.fillStyle = C.scale;
+      ctx.globalAlpha = 0.92;
+      roundRect(ctx, x, y, boxW, boxH, 6);
+      ctx.fill();
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = 'rgba(255,255,255,.7)';
+      ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+      ctx.fillText('berth ' + (i+1), x+6, y+boxH/2+4);
+    }
+  }
+
+  function roundRect(ctx,x,y,w,hh,r){
+    ctx.beginPath();
+    ctx.moveTo(x+r,y);
+    ctx.arcTo(x+w,y,x+w,y+hh,r);
+    ctx.arcTo(x+w,y+hh,x,y+hh,r);
+    ctx.arcTo(x,y+hh,x,y,r);
+    ctx.arcTo(x,y,x+w,y,r);
+    ctx.closePath();
+  }
+
+  rSlider.addEventListener('input', draw);
+  cSlider.addEventListener('input', draw);
+  window.addEventListener('resize', resize);
+  window.addEventListener('load', resize);
+  setTimeout(resize, 300);
+
+  return {computeN: computeN, draw: draw};
+})();
+
+/* =========================================================
+   Section 3 — crate yard (independent microservice updates)
+   ========================================================= */
+(function(){
+  var yard = document.getElementById('crateYard');
+  var names = [
+    {name:'Cart service', colour: C.micro},
+    {name:'Catalogue service', colour: C.scale},
+    {name:'Payment service', colour: C.secure},
+    {name:'Notification service', colour: C.resilient}
+  ];
+  names.forEach(function(svc){
+    var card = document.createElement('div');
+    card.style.background = '#fff';
+    card.style.border = '1px solid ' + C.hair;
+    card.style.borderRadius = '10px';
+    card.style.padding = '14px';
+    card.style.minWidth = '150px';
+    card.style.flex = '1 1 150px';
+    card.style.borderTop = '4px solid ' + svc.colour;
+
+    var title = document.createElement('div');
+    title.style.fontWeight = '600';
+    title.style.fontSize = '14px';
+    title.textContent = svc.name;
+
+    var version = document.createElement('div');
+    version.style.fontFamily = 'var(--mono)';
+    version.style.fontSize = '12px';
+    version.style.color = C.soft;
+    version.style.margin = '6px 0 10px';
+    version.textContent = 'v1.0.0';
+
+    var btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.style.fontSize = '12px';
+    btn.style.padding = '6px 10px';
+    btn.textContent = 'Ship update';
+
+    var minor = 0;
+    btn.addEventListener('click', function(){
+      minor++;
+      version.textContent = 'v1.0.0 → v1.' + minor + '.0';
+      card.style.background = svc.colour + '18';
+      setTimeout(function(){ card.style.background = '#fff'; }, 700);
+    });
+
+    card.appendChild(title);
+    card.appendChild(version);
+    card.appendChild(btn);
+    yard.appendChild(card);
+  });
+})();
+
+/* =========================================================
+   Section 4 — rolling update SVG animation
+   ========================================================= */
+(function(){
+  var svg = document.getElementById('rollSvg');
+  var caption = document.getElementById('rollCaption');
+  var rollBtn = document.getElementById('rollBtn');
+  var resetBtn = document.getElementById('resetRollBtn');
+  var instances = 3;
+  var state = new Array(instances).fill('v1.0');
+  var rolling = false;
+
+  function render(){
+    var w = 680, h = 170;
+    var boxW = 160, gap = 30;
+    var startX = (w - (boxW*instances + gap*(instances-1))) / 2;
+    var html = '';
+    for(var i=0;i<instances;i++){
+      var x = startX + i*(boxW+gap);
+      var isOld = state[i] === 'v1.0';
+      var fill = isOld ? C.hair2 : C.resilientSoft;
+      var stroke = isOld ? C.soft : C.resilient;
+      var labelColor = isOld ? C.soft : C.resilient;
+      html += '<rect x="'+x+'" y="30" width="'+boxW+'" height="90" rx="10" fill="'+fill+'" stroke="'+stroke+'" stroke-width="2"/>';
+      html += '<text x="'+(x+boxW/2)+'" y="60" text-anchor="middle" font-size="12" fill="'+C.ink+'" font-family="var(--mono)">instance '+(i+1)+'</text>';
+      html += '<text x="'+(x+boxW/2)+'" y="90" text-anchor="middle" font-size="16" font-weight="700" fill="'+labelColor+'" font-family="var(--disp)">'+state[i]+'</text>';
+    }
+    svg.innerHTML = html;
+    var updated = state.filter(function(s){return s!=='v1.0';}).length;
+    if(updated === 0){
+      caption.innerHTML = 'Currently serving: <b>App v1.0</b> on ' + instances + ' instances — 0% downtime so far.';
+    } else if(updated < instances){
+      caption.innerHTML = updated + ' of ' + instances + ' instances now on <b>v1.1</b>, rest still serving <b>v1.0</b> — traffic never stopped.';
+    } else {
+      caption.innerHTML = 'Rolling update complete: all ' + instances + ' instances now on <b>App v1.1</b> — zero downtime the whole way through.';
+    }
+  }
+
+  rollBtn.addEventListener('click', function(){
+    if(rolling) return;
+    rolling = true;
+    rollBtn.disabled = true;
+    var i = 0;
+    var step = function(){
+      if(i >= instances){ rolling = false; rollBtn.disabled = false; return; }
+      state[i] = 'v1.1';
+      render();
+      i++;
+      setTimeout(step, 550);
+    };
+    step();
+  });
+
+  resetBtn.addEventListener('click', function(){
+    state = new Array(instances).fill('v1.0');
+    rolling = false;
+    rollBtn.disabled = false;
+    render();
+  });
+
+  render();
+})();
+
+/* =========================================================
+   Section 5 — resiliency SVG + availability formula
+   ========================================================= */
+var ResDemo = (function(){
+  var svg = document.getElementById('resSvg');
+  var dMinSlider = document.getElementById('dMinSlider');
+  var incSlider = document.getElementById('incSlider');
+  var dMinVal = document.getElementById('dMinVal');
+  var incVal = document.getElementById('incVal');
+  var availMetric = document.getElementById('availMetric');
+  var cFailed = false;
+
+  function computeAvailability(minutesPerIncident, incidentsPerYear){
+    var minutesPerYear = 365*24*60;
+    var downtime = minutesPerIncident * incidentsPerYear;
+    var uptime = minutesPerYear - downtime;
+    if(uptime < 0) uptime = 0;
+    return uptime / (uptime + downtime);
+  }
+
+  function render(){
+    var services = ['Microservice A','Microservice B','Microservice C'];
+    var w=680,h=130, boxW=170, gap=40;
+    var startX = (w-(boxW*3+gap*2))/2;
+    var html = '<text x="20" y="20" font-size="12" fill="'+C.soft+'" font-family="var(--mono)">User request</text>';
+    for(var i=0;i<3;i++){
+      var x = startX + i*(boxW+gap);
+      var isC = i===2;
+      var down = isC && cFailed;
+      var fill = down ? C.secureSoft : C.microSoft;
+      var stroke = down ? C.secure : C.micro;
+      html += '<rect x="'+x+'" y="35" width="'+boxW+'" height="60" rx="8" fill="'+fill+'" stroke="'+stroke+'" stroke-width="2" style="cursor:'+(isC?'pointer':'default')+'" data-svc="'+i+'"/>';
+      html += '<text x="'+(x+boxW/2)+'" y="70" text-anchor="middle" font-size="13" font-family="var(--body)" fill="'+(down?C.secure:C.ink)+'" font-weight="600">'+services[i]+(down?' (down)':'')+'</text>';
+      if(i<2){
+        html += '<line x1="'+(x+boxW)+'" y1="65" x2="'+(x+boxW+gap)+'" y2="65" stroke="'+C.hair+'" stroke-width="2" marker-end="url(#arrow)"/>';
+      }
+    }
+    html = '<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="'+C.soft+'"/></marker></defs>' + html;
+    if(cFailed){
+      html += '<text x="'+(startX+ (boxW+gap)*2 + boxW/2)+'" y="115" text-anchor="middle" font-size="12" fill="'+C.secure+'" font-family="var(--mono)">fallback: "delayed, please retry"</text>';
+    }
+    svg.innerHTML = html;
+    var target = svg.querySelector('[data-svc="2"]');
+    if(target){
+      target.addEventListener('click', function(){ cFailed = !cFailed; render(); });
+    }
+  }
+
+  function updateMetric(){
+    var m = parseInt(dMinSlider.value,10);
+    var n = parseInt(incSlider.value,10);
+    dMinVal.textContent = m;
+    incVal.textContent = n;
+    var A = computeAvailability(m,n);
+    availMetric.innerHTML = (A*100).toFixed(4) + '%<small>yearly availability (A)</small>';
+  }
+
+  dMinSlider.addEventListener('input', updateMetric);
+  incSlider.addEventListener('input', updateMetric);
+
+  render();
+  updateMetric();
+  return {computeAvailability: computeAvailability};
+})();
+
+/* =========================================================
+   Section 7 — mesh toggle SVG
+   ========================================================= */
+(function(){
+  var svg = document.getElementById('meshSvg');
+  var btn = document.getElementById('meshToggle');
+  var caption = document.getElementById('meshCaption');
+  var meshOn = false;
+
+  function render(){
+    var w=680,h=190;
+    var boxW=180, boxH= meshOn?110:70, gap=220;
+    var xA=60, xB=xA+boxW+gap;
+    var yTop=20;
+    var html='';
+    html += '<rect x="'+xA+'" y="'+yTop+'" width="'+boxW+'" height="'+boxH+'" rx="10" fill="'+C.microSoft+'" stroke="'+C.micro+'" stroke-width="2"/>';
+    html += '<text x="'+(xA+boxW/2)+'" y="'+(yTop+22)+'" text-anchor="middle" font-size="13" font-weight="700" fill="'+C.micro+'">Service A</text>';
+    html += '<rect x="'+xB+'" y="'+yTop+'" width="'+boxW+'" height="'+boxH+'" rx="10" fill="'+C.microSoft+'" stroke="'+C.micro+'" stroke-width="2"/>';
+    html += '<text x="'+(xB+boxW/2)+'" y="'+(yTop+22)+'" text-anchor="middle" font-size="13" font-weight="700" fill="'+C.micro+'">Service B</text>';
+
+    if(meshOn){
+      var pY = yTop+55;
+      html += '<rect x="'+(xA+16)+'" y="'+pY+'" width="'+(boxW-32)+'" height="26" rx="6" fill="'+C.resilient+'"/>';
+      html += '<text x="'+(xA+boxW/2)+'" y="'+(pY+18)+'" text-anchor="middle" font-size="11" fill="#fff" font-family="var(--mono)">proxy</text>';
+      html += '<rect x="'+(xB+16)+'" y="'+pY+'" width="'+(boxW-32)+'" height="26" rx="6" fill="'+C.resilient+'"/>';
+      html += '<text x="'+(xB+boxW/2)+'" y="'+(pY+18)+'" text-anchor="middle" font-size="11" fill="#fff" font-family="var(--mono)">proxy</text>';
+
+      var ctrlY = yTop+boxH+38;
+      html += '<rect x="'+(xA+boxW/2+gap/2-70)+'" y="'+ctrlY+'" width="140" height="40" rx="8" fill="'+C.scaleSoft+'" stroke="'+C.scale+'"/>';
+      html += '<text x="'+(xA+boxW/2+gap/2)+'" y="'+(ctrlY+25)+'" text-anchor="middle" font-size="11" fill="'+C.scale+'" font-family="var(--mono)">control plane</text>';
+      html += '<line x1="'+(xA+boxW/2)+'" y1="'+(pY+13)+'" x2="'+(xA+boxW/2+gap/2-70)+'" y2="'+(ctrlY+20)+'" stroke="'+C.scale+'" stroke-dasharray="3,3"/>';
+      html += '<line x1="'+(xB+boxW/2)+'" y1="'+(pY+13)+'" x2="'+(xA+boxW/2+gap/2+70)+'" y2="'+(ctrlY+20)+'" stroke="'+C.scale+'" stroke-dasharray="3,3"/>';
+      html += '<line x1="'+(xA+boxW)+'" y1="'+(pY+13)+'" x2="'+xB+'" y2="'+(pY+13)+'" stroke="'+C.resilient+'" stroke-width="3" marker-end="url(#arrow2)"/>';
+      html += '<text x="'+(xA+boxW/2+gap/2)+'" y="'+(pY+6)+'" text-anchor="middle" font-size="10" fill="'+C.resilient+'" font-family="var(--mono)">encrypted (mTLS)</text>';
+    } else {
+      var midY = yTop+boxH/2;
+      html += '<line x1="'+(xA+boxW)+'" y1="'+midY+'" x2="'+xB+'" y2="'+midY+'" stroke="'+C.soft+'" stroke-width="3" marker-end="url(#arrow2)"/>';
+      html += '<text x="'+(xA+boxW/2+gap/2)+'" y="'+(midY-10)+'" text-anchor="middle" font-size="10" fill="'+C.soft+'" font-family="var(--mono)">plain call, no retries/encryption built in</text>';
+    }
+    html = '<defs><marker id="arrow2" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6" fill="'+(meshOn?C.resilient:C.soft)+'"/></marker></defs>' + html;
+    svg.innerHTML = html;
+    btn.textContent = meshOn ? 'Turn service mesh OFF' : 'Turn service mesh ON';
+    caption.innerHTML = meshOn
+      ? 'With the mesh: every call passes through a local <b>proxy</b> that a control plane configures — encryption, retries and circuit breaking are consistent across every microservice, automatically.'
+      : 'Without a mesh: Service A calls Service B directly. Any retry logic, encryption or timeout handling has to be hand-written into each microservice separately.';
+  }
+
+  btn.addEventListener('click', function(){ meshOn = !meshOn; render(); });
+  render();
+})();
+
+/* =========================================================
+   Likes, comments, email capture (Supabase-backed)
+   SQL SETUP — see references/sql-schema.sql in the groundwork-article skill.
+   New comments default to approved = false — approve them in the Supabase
+   Table Editor before they show up for other visitors.
+   ========================================================= */
+(function(){
+  var CONFIGURED = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY &&
+    CONFIG.SUPABASE_URL.indexOf('supabase.co')!==-1 && CONFIG.SUPABASE_ANON_KEY.indexOf('YOUR_')!==0);
+  var sb=null;
+
+  function initClient(){
+    if(!CONFIGURED || !window.supabase || sb) return;
+    sb=window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    loadLikeCounts(); loadComments();
+  }
+  window.__sbReady=initClient;
+
+  var LS_EMAIL='groundwork_email', LS_NAME='groundwork_name';
+  function getIdentity(){
+    try{ var e=localStorage.getItem(LS_EMAIL); return e?{email:e,name:localStorage.getItem(LS_NAME)||''}:null; }
+    catch(err){ return null; }
+  }
+  function saveIdentity(email,name){
+    try{ localStorage.setItem(LS_EMAIL,email); localStorage.setItem(LS_NAME,name||''); }catch(err){}
+  }
+
+  var pendingAction=null;
+  function openModal(action){
+    pendingAction=action;
+    el('mErr').textContent='';
+    el('emailModalBg').removeAttribute('hidden');
+    el('mEmail').focus();
+  }
+  function closeModal(){ el('emailModalBg').setAttribute('hidden',''); pendingAction=null; }
+  on('mCancel','click',closeModal);
+  on('mContinue','click',function(){
+    var email=el('mEmail').value.trim(), name=el('mName').value.trim();
+    if(!name){ el('mErr').textContent='Please enter your name.'; return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ el('mErr').textContent='Please enter a valid email address.'; return; }
+    saveIdentity(email,name);
+    if(CONFIGURED && sb){ sb.from('subscribers').insert({email:email, article_id:CONFIG.ARTICLE_ID}).then(function(){}); }
+    var act=pendingAction; closeModal();
+    if(act) act({email:email,name:name});
+  });
+  function requireIdentity(action){
+    var id=getIdentity();
+    if(id) action(id); else openModal(action);
+  }
+
+  /* ---- likes ---- */
+  function renderLikeButtons(){
+    var secs=document.querySelectorAll('section.s[id^="s"]'); // numbered sections only — matches this article's section class
+    for(var i=0;i<secs.length;i++){
+      var sec=secs[i], h2=sec.querySelector('h2'); if(!h2) continue;
+      var btn=document.createElement('button');
+      btn.type='button'; btn.className='likebtn'; btn.setAttribute('data-sec',sec.id);
+      btn.innerHTML='<span class="hrt">🤍</span><span class="cnt">0</span> like this section';
+      h2.insertAdjacentElement('afterend', btn);
+      (function(btn,secId){
+        btn.addEventListener('click',function(){
+          if(btn.classList.contains('liked')) return;
+          requireIdentity(function(id){ doLike(secId,btn,id); });
+        });
+      })(btn,sec.id);
+    }
+  }
+  function doLike(sectionId,btn,id){
+    btn.classList.add('liked');
+    btn.querySelector('.hrt').textContent='❤';
+    var cnt=btn.querySelector('.cnt');
+    cnt.textContent=(parseInt(cnt.textContent,10)||0)+1;
+    try{ localStorage.setItem('groundwork_liked_'+CONFIG.ARTICLE_ID+'_'+sectionId,'1'); }catch(e){}
+    if(CONFIGURED && sb){
+      sb.from('likes').insert({article_id:CONFIG.ARTICLE_ID, section_id:sectionId, email:id.email}).then(function(res){
+        if(res && res.error && !/duplicate/i.test(res.error.message||'')) console.warn('like failed', res.error);
+      });
+    }
+  }
+  function restoreLikedState(){
+    var btns=document.querySelectorAll('.likebtn');
+    for(var i=0;i<btns.length;i++){
+      var sid=btns[i].getAttribute('data-sec');
+      try{
+        if(localStorage.getItem('groundwork_liked_'+CONFIG.ARTICLE_ID+'_'+sid)==='1'){
+          btns[i].classList.add('liked'); btns[i].querySelector('.hrt').textContent='❤';
+        }
+      }catch(e){}
+    }
+  }
+  function loadLikeCounts(){
+    if(!(CONFIGURED && sb)) return;
+    sb.from('likes').select('section_id').eq('article_id',CONFIG.ARTICLE_ID).then(function(res){
+      if(!res||res.error||!res.data) return;
+      var counts={};
+      for(var i=0;i<res.data.length;i++){ var s=res.data[i].section_id; counts[s]=(counts[s]||0)+1; }
+      var btns=document.querySelectorAll('.likebtn');
+      for(var j=0;j<btns.length;j++){
+        var sid=btns[j].getAttribute('data-sec');
+        btns[j].querySelector('.cnt').textContent = counts[sid]||0;
+      }
+    });
+  }
+
+  /* ---- comments ---- */
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function renderComment(c){
+    var div=document.createElement('div'); div.className='ccard';
+    var name=(c.name && c.name.length) ? escapeHtml(c.name) : 'Anonymous';
+    div.innerHTML='<div class="cname">'+name+'</div><div class="cbody">'+escapeHtml(c.body)+'</div>';
+    return div;
+  }
+  function loadComments(){
+    if(!(CONFIGURED && sb)) return;
+    sb.from('comments').select('name,body,created_at').eq('article_id',CONFIG.ARTICLE_ID).eq('section_id','general').eq('approved',true)
+      .order('created_at',{ascending:false}).then(function(res){
+        if(!res||res.error||!res.data) return;
+        var list=el('cList'); list.innerHTML='';
+        for(var i=0;i<res.data.length;i++) list.appendChild(renderComment(res.data[i]));
+      });
+  }
+  on('cSubmit','click',function(){
+    var body=el('cBody').value.trim();
+    if(!body){ el('cStatus').textContent='Write something first.'; return; }
+    requireIdentity(function(id){
+      el('cStatus').textContent='Posting…';
+      var localC={name:id.name,body:body};
+      if(CONFIGURED && sb){
+        sb.from('comments').insert({article_id:CONFIG.ARTICLE_ID, section_id:'general', email:id.email, name:id.name, body:body}).then(function(res){
+          if(res && res.error){ el('cStatus').textContent='Could not post — please try again.'; return; }
+          el('cList').insertBefore(renderComment(localC), el('cList').firstChild);
+          el('cBody').value='';
+          el('cStatus').textContent='Posted — it\'ll appear for other visitors after a quick review.';
+        });
+      } else {
+        el('cList').insertBefore(renderComment(localC), el('cList').firstChild);
+        el('cBody').value='';
+        el('cStatus').textContent='Posted on this screen only — backend not configured yet, see setup notes above.';
+      }
+    });
+  });
+
+  if(!CONFIGURED){ var note=el('commentsConfigNote'); if(note) note.removeAttribute('hidden'); }
+  renderLikeButtons();
+  restoreLikedState();
+  if(CONFIGURED && window.supabase) initClient();
+})();
+</script>
+</body>
+</html>
