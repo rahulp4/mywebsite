@@ -16,6 +16,20 @@ Each write-up is a single self-contained HTML file — its own design, its own i
 demos, its own optional voice narration. The homepage doesn't know or care what's inside
 one; it just links to it.
 
+## Made for AI readers, not just human ones
+
+Every article ships with a plain-Markdown twin (e.g. `articles/ml-fundamentals.md`) —
+the same content, without the interactivity, meant for pasting into an AI chat as
+context. Inside each article: a "📋 Copy this article for your AI" button copies that
+Markdown straight to the clipboard, and every section has 2 suggested prompts ("Ask
+your AI about this section") a reader can copy with one click. `llms.txt` at the site
+root follows the [llmstxt.org](https://llmstxt.org) convention, pointing AI crawlers at
+each article's Markdown version.
+
+When adding a new write-up, keep this pattern going: write a Markdown twin, embed it in
+the article as the `ARTICLE_MARKDOWN` constant for the copy button, write 2 suggested
+prompts per section, and add an entry to `llms.txt`.
+
 ## Adding a new write-up
 
 1. Build the new page the same way this one was built (or ask me to build it) — save it as

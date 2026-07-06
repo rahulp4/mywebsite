@@ -1,0 +1,13 @@
+# Groundwork
+
+> A personal shelf of interactive, from-first-principles technology write-ups — each one a single self-contained webpage with animated demos, worked examples, and live calculations, not just prose. Built and maintained by Rahul.
+
+Groundwork articles are designed to be read by both people and AI assistants. Every article has a plain-Markdown version (linked below) intended for pasting into an AI chat as context — use it to ask follow-up questions, request quizzes, or have a section re-explained a different way. The interactive HTML versions include live sliders, canvas/SVG demos, and equations, none of which survive a plain-text scrape, so the Markdown versions exist specifically to give AI systems accurate, complete context without needing to parse JavaScript.
+
+## Articles
+
+- [Machine Learning from First Principles](https://rahulp4.github.io/mywebsite/articles/ml-fundamentals.html): Linear regression and gradient descent taught through one worked example (predicting house prices), covering the model, the loss function, derivatives, gradients, gradient descent, the training loop, a live worked example, the loss-surface visualization, and generalization to logistic regression and neural networks. [Markdown version](https://rahulp4.github.io/mywebsite/articles/ml-fundamentals.md) for AI context.
+
+## Optional
+
+- [Homepage](https://rahulp4.github.io/mywebsite/): card-grid index of all Groundwork articles.

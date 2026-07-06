@@ -108,7 +108,7 @@ footer{border-top:1px dashed var(--hair); padding:40px 0 50px; margin-top:30px}
 /* =============== SETUP: Supabase credentials now live in assets/config.js ===== *
  * Fill them in once there — this page and every article reuse the same values.
  * ================================================================================ */
-var CONFIG = window.CONFIG_SHARED || { SUPABASE_URL:'https://gmcbnnsgpqvboatqjszb.supabase.co', SUPABASE_ANON_KEY:'sb_publishable_ta8TNaIyn-0XHyqn3Cfh7A_iQ2sgvFu' };
+var CONFIG = window.CONFIG_SHARED || { SUPABASE_URL:'YOUR_SUPABASE_URL', SUPABASE_ANON_KEY:'YOUR_SUPABASE_ANON_KEY' };
 var CONFIGURED = !!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY &&
   CONFIG.SUPABASE_URL.indexOf('supabase.co')!==-1 && CONFIG.SUPABASE_ANON_KEY.indexOf('YOUR_')!==0);
 var sb=null;
@@ -132,26 +132,6 @@ var ARTICLES=[
     minutes:35,
     date:'2026-07-03',
     path:'articles/ml-fundamentals.html'
-  },
-  {
-    slug:'Cloud Native Fundamentals',
-    title:'Cloud Native Fundametals',
-    tagline:'Learn what is cloud native applications',
-    category:'Cloud',
-    accent:'#FF6B35',
-    minutes:35,
-    date:'2026-07-03',
-    path:'articles/cloud-native-fundamentals_1.html'
-  },
-  {
-    slug:'Cloud Native with Dapr',
-    title:'Cloud Native Development with Dapr',
-    tagline:'Cloud Native Development with Dapr.',
-    category:'Cloud',
-    accent:'#FF6B35',
-    minutes:35,
-    date:'2026-07-03',
-    path:'articles/Cloud_Native_to_Dapr.html'
   }
 ];
 
