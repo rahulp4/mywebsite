@@ -7,6 +7,8 @@ Groundwork articles are designed to be read by both people and AI assistants. Ev
 ## Articles
 
 - [Machine Learning from First Principles](https://cloudsnativeai.cloud/articles/ml-fundamentals.html): Linear regression and gradient descent taught through one worked example (predicting house prices), covering the model, the loss function, derivatives, gradients, gradient descent, the training loop, a live worked example, the loss-surface visualization, and generalization to logistic regression and neural networks. [Markdown version](https://cloudsnativeai.cloud/articles/ml-fundamentals.md) for AI context.
+- [Cloud Native to Dapr](https://cloudsnativeai.cloud/articles/Cloud_Native_to_Dapr.html): An architecture deep-dive from why cloud native exists, through containers and Kubernetes, to the sidecar runtime (Dapr) that lifts cross-cutting concerns — discovery, state, messaging, secrets, retries, telemetry — out of application code.
+- [Cloud Native Applications, from First Principles](https://cloudsnativeai.cloud/articles/cloud-native-fundamentals_1.html): Why running in the cloud isn't the same as being cloud native, and how containers, Kubernetes, and a service mesh turn a fragile monolith into something that scales and heals itself.
 
 ## Optional
 
