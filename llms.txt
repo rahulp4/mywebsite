@@ -6,8 +6,8 @@ Groundwork articles are designed to be read by both people and AI assistants. Ev
 
 ## Articles
 
-- [Machine Learning from First Principles](https://rahulp4.github.io/mywebsite/articles/ml-fundamentals.html): Linear regression and gradient descent taught through one worked example (predicting house prices), covering the model, the loss function, derivatives, gradients, gradient descent, the training loop, a live worked example, the loss-surface visualization, and generalization to logistic regression and neural networks. [Markdown version](https://rahulp4.github.io/mywebsite/articles/ml-fundamentals.md) for AI context.
+- [Machine Learning from First Principles](https://cloudsnativeai.cloud/articles/ml-fundamentals.html): Linear regression and gradient descent taught through one worked example (predicting house prices), covering the model, the loss function, derivatives, gradients, gradient descent, the training loop, a live worked example, the loss-surface visualization, and generalization to logistic regression and neural networks. [Markdown version](https://cloudsnativeai.cloud/articles/ml-fundamentals.md) for AI context.
 
 ## Optional
 
-- [Homepage](https://rahulp4.github.io/mywebsite/): card-grid index of all Groundwork articles.
+- [Homepage](https://cloudsnativeai.cloud/): card-grid index of all Groundwork articles.
