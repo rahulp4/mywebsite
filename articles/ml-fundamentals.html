@@ -1401,9 +1401,17 @@ function animateNum(from,to,dur,cb){
   if(CONFIGURED && window.supabase) initClient();
 })();
 
-/* =============== AI tools: copy-as-markdown + per-section suggested prompts =============== */
+/* =============== AI tools: copy-as-markdown + context-aware suggested prompts =============== *
+ * Built from the groundwork-article skill's assets/ai-tools-module.html. Each
+ * suggested prompt copies the question wrapped in real context (the article's
+ * core areas + this specific section's summary), not just the bare question,
+ * so a single copied chip is useful pasted into a brand-new AI chat on its own.
+ * ======================================================================== */
 (function(){
   var fab=el('aiCopyFab'); if(!fab) return;
+
+  var ARTICLE_TITLE = "Machine Learning from First Principles";
+  var ARTICLE_SUMMARY = "Linear regression and gradient descent, taught through one worked example (predicting house prices from size) \u2014 covering the model, the loss function, derivatives, gradients, the gradient descent update rule, the full training loop, a live worked numerical example, a visualization of the loss surface, and how the same approach generalizes to logistic regression and neural networks.";
 
   var ARTICLE_MARKDOWN=`# Machine Learning from First Principles
 
@@ -1664,6 +1672,33 @@ direction that reduces prediction error, guided step-by-step by derivatives
 until the predictions are as accurate as possible.
 `;
 
+  var SECTION_SUMMARIES = {
+    s1: "What machine learning fundamentally is \u2014 letting a computer discover a rule from labeled examples rather than a human writing the rule by hand, illustrated with candidate lines fit to house-price data.",
+    s2: "The model itself: a straight line \u0177 = w\u00b7x + b with two adjustable knobs (weight and bias), illustrated with a slider demo and a college-admissions weighting analogy.",
+    s3: "The loss function (Mean Squared Error) \u2014 why errors are squared, and a live demo computing the loss for a bad line (17.50) versus a perfect line (0).",
+    s4: "Derivatives \u2014 the slope of a curve at a point, explained via a blindfolded-hiker analogy, plus the power rule and chain rule needed later.",
+    s5: "The gradient \u2014 the slope for each of the two knobs (w and b) \u2014 derived via the chain rule, with a demo showing which direction to nudge each knob.",
+    s6: "Gradient descent's update rule and the learning rate \u2014 a live race between three step sizes that crawl, converge cleanly, or diverge.",
+    s7: "The four-step training loop (predict, measure, gradient, update), illustrated with a soup-seasoning analogy and a loop diagram.",
+    s8: "The full worked example run live: starting at w=0, b=0 and stepping through real iterations of gradient descent on the house data, matching the chapter's hand-calculated numbers.",
+    s9: "The loss surface as a bowl shape, visualized as both a contour map and a 3D wireframe, with the actual gradient-descent path animated across it.",
+    s10: "How this same machinery generalizes to logistic regression (via the sigmoid) and neural networks (via stacked layers and backpropagation).",
+    s11: "A recap of the five core formulas and the most common practical pitfalls: bad learning rates, unscaled features, and local minima."
+  };
+  var PROMPTS = {
+    s1: ["Give me three more real-world examples of supervised learning besides spam filters and handwriting recognition.", "How is this fundamentally different from a rule-based program? Show me a tiny code example of each."],
+    s2: ["Rewrite the model equation for 3 input features instead of 1, and explain what changes.", "Explain the admissions weight example again, but using a hiring decision instead of college."],
+    s3: ["Walk me through the MSE calculation by hand for a small dataset I give you.", "Why not use absolute error instead of squared error? What would change?"],
+    s4: ["Explain the chain rule again using a completely different everyday analogy.", "Show me the derivative of x\\u00b3 using the power rule, step by step."],
+    s5: ["Derive \\u2202L/\\u2202w and \\u2202L/\\u2202b again, but for a model with two input features instead of one.", "Explain why unscaled features cause problems, using a concrete numeric example of your own."],
+    s6: ["If my loss oscillates instead of shrinking, what learning rate range should I try next, and why?", "Explain learning rate decay and why it's often used in practice."],
+    s7: ["Give me a different everyday analogy for the training loop besides seasoning soup.", "How would this loop need to change if I had a million data points instead of three?"],
+    s8: ["Continue the worked example for 3 more iterations by hand, showing the arithmetic.", "At roughly what iteration does the loss drop below 0.001? Estimate it."],
+    s9: ["Why is the loss surface always bowl-shaped for linear regression specifically?", "What would the loss surface look like if the model badly underfit the data?"],
+    s10: ["Walk me through backpropagation on a small 2-layer network with actual numbers.", "What loss function does logistic regression use instead of MSE, and why?"],
+    s11: ["Quiz me on this chapter, one question per section, and don't reveal the answer until I try.", "What's the very next topic I should learn after this, and why?"]
+  };
+
   function copyText(text, btn, doneLabel, restoreLabel){
     function ok(){
       var orig=restoreLabel!==undefined?restoreLabel:btn.innerHTML;
@@ -1692,31 +1727,12 @@ until the predictions are as accurate as possible.
     copyText(ARTICLE_MARKDOWN, fab, '\u2713 Copied \u2014 paste into your AI', '\ud83d\udccb Copy this article for your AI');
   });
 
-  /* ---- per-section suggested prompts ---- */
-  var PROMPTS={
-    s1:["Give me three more real-world examples of supervised learning besides spam filters and handwriting recognition.",
-        "How is this fundamentally different from a rule-based program? Show me a tiny code example of each."],
-    s2:["Rewrite the model equation for 3 input features instead of 1, and explain what changes.",
-        "Explain the admissions weight example again, but using a hiring decision instead of college."],
-    s3:["Walk me through the MSE calculation by hand for a small dataset I give you.",
-        "Why not use absolute error instead of squared error? What would change?"],
-    s4:["Explain the chain rule again using a completely different everyday analogy.",
-        "Show me the derivative of x\u00b3 using the power rule, step by step."],
-    s5:["Derive \u2202L/\u2202w and \u2202L/\u2202b again, but for a model with two input features instead of one.",
-        "Explain why unscaled features cause problems, using a concrete numeric example of your own."],
-    s6:["If my loss oscillates instead of shrinking, what learning rate range should I try next, and why?",
-        "Explain learning rate decay and why it's often used in practice."],
-    s7:["Give me a different everyday analogy for the training loop besides seasoning soup.",
-        "How would this loop need to change if I had a million data points instead of three?"],
-    s8:["Continue the worked example for 3 more iterations by hand, showing the arithmetic.",
-        "At roughly what iteration does the loss drop below 0.001? Estimate it."],
-    s9:["Why is the loss surface always bowl-shaped for linear regression specifically?",
-        "What would the loss surface look like if the model badly underfit the data?"],
-    s10:["Walk me through backpropagation on a small 2-layer network with actual numbers.",
-         "What loss function does logistic regression use instead of MSE, and why?"],
-    s11:["Quiz me on this chapter, one question per section, and don't reveal the answer until I try.",
-         "What's the very next topic I should learn after this, and why?"]
-  };
+  function buildPrompt(sectionId, question){
+    var sectionSummary = SECTION_SUMMARIES[sectionId] || '';
+    return "Context: I'm reading an interactive article called \"" + ARTICLE_TITLE + "\" which covers: " + ARTICLE_SUMMARY +
+      "\n\nThis question is about one section of it" + (sectionSummary ? (": " + sectionSummary) : ".") +
+      "\n\nMy question: " + question;
+  }
 
   function renderAskAI(){
     var secs=document.querySelectorAll('section.chapter[id^="s"]');
@@ -1726,12 +1742,16 @@ until the predictions are as accurate as possible.
       box.className='askai';
       box.innerHTML='<span class="tag">\ud83e\udd16 Ask your AI about this section</span><div class="askrow"></div>';
       var row=box.querySelector('.askrow');
-      prompts.forEach(function(p){
+      prompts.forEach(function(q){
         var chip=document.createElement('button');
         chip.type='button'; chip.className='askchip';
         chip.innerHTML='<span class="ico">\ud83d\udccb</span><span class="txt"></span>';
-        chip.querySelector('.txt').textContent='\u201c'+p+'\u201d';
-        chip.addEventListener('click',function(){ copyText(p, chip, '\u2713 Copied'); });
+        chip.querySelector('.txt').textContent='\u201c'+q+'\u201d';
+        (function(sectionId, questionText, chipEl){
+          chipEl.addEventListener('click',function(){
+            copyText(buildPrompt(sectionId, questionText), chipEl, '\u2713 Copied with context');
+          });
+        })(sec.id, q, chip);
         row.appendChild(chip);
       });
       sec.appendChild(box);
@@ -1739,7 +1759,6 @@ until the predictions are as accurate as possible.
   }
   renderAskAI();
 })();
-
 /* =============== KaTeX rendering with plain-text fallback =============== */
 window.__texReady=function(){
   if(!window.katex) return;

@@ -798,11 +798,14 @@ metadata:
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer onload="window.__sbReady && window.__sbReady()"></script>
 <script src="config.js"></script>
 <script>
-/* CONFIG is loaded from config.js — see that file to set SUPABASE_URL, SUPABASE_ANON_KEY, ARTICLE_ID */
+/* CONFIG base is loaded from config.js (SUPABASE_URL, SUPABASE_ANON_KEY).
+   Each article stamps its own unique ARTICLE_ID via Object.assign so every
+   article in the site shares one credential file without mixing its data. */
 if (typeof CONFIG === 'undefined') {
-  console.warn('config.js not found or CONFIG not defined — engagement features will run in offline mode.');
-  window.CONFIG = { SUPABASE_URL:'', SUPABASE_ANON_KEY:'', ARTICLE_ID:'cloud-native-to-dapr' };
+  console.warn('config.js not found — engagement features will run in offline mode.');
+  window.CONFIG = { SUPABASE_URL:'YOUR_SUPABASE_URL', SUPABASE_ANON_KEY:'YOUR_SUPABASE_ANON_KEY' };
 }
+Object.assign(CONFIG, { ARTICLE_ID:'cloud-native-to-dapr' });
 
 function el(id){ return document.getElementById(id); }
 function on(id,ev,fn){ var e=el(id); if(e) e.addEventListener(ev,fn); }
@@ -1140,7 +1143,9 @@ var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:co
 
 /* ---------------- narrator module ---------------- */
 (function(){
-  var fab=el('narrFab'), panel=el('narrPanel'); if(!fab) return;
+  var fab=document.getElementById('narrFab'), panel=document.getElementById('narrPanel'); if(!fab) return;
+  function el(id){ return document.getElementById(id); }
+  function on(id,ev,fn){ var e=el(id); if(e) e.addEventListener(ev,fn); }
   var supported = ('speechSynthesis' in window);
 
   var TITLES={ top:'Introduction', s1:'Why cloud native', s2:'Containers & Kubernetes', s3:'Cross-cutting concerns', s4:'The Dapr approach', s5:'Building blocks', s6:'Running Dapr', s7:'Recap', comments:'Comments' };
