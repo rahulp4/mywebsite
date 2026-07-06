@@ -155,7 +155,53 @@ canvas.plot{width:100%; display:block; border-radius:10px; background:#FCFDFC; b
 
 footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1px solid var(--hair); margin-top:40px}
 
+/* ---------- voice narrator ---------- */
+#narrator{position:fixed; right:20px; bottom:20px; z-index:70; display:flex; flex-direction:column; align-items:flex-end; gap:10px}
+.narr-fab{
+  width:52px; height:52px; border-radius:50%; border:none; cursor:pointer;
+  background:var(--ink); color:#fff; font-size:20px; box-shadow:var(--shadow);
+  display:flex; align-items:center; justify-content:center; transition:background .15s, transform .15s;
+}
+.narr-fab:hover{background:#0d1a1f}
+.narr-fab.active{background:var(--micro)}
+.narr-fab.speaking{animation:narrpulse 1.4s ease-in-out infinite}
+@keyframes narrpulse{0%,100%{box-shadow:0 0 0 0 rgba(47,92,138,.45)}50%{box-shadow:0 0 0 10px rgba(47,92,138,0)}}
+@media (prefers-reduced-motion:reduce){ .narr-fab.speaking{animation:none} }
+.narr-panel{
+  width:270px; background:var(--card); border:1px solid var(--hair); border-radius:var(--r);
+  box-shadow:var(--shadow); padding:16px; font-size:13.5px;
+}
+.narr-panel h4{margin:0 0 10px; font-family:var(--disp); font-weight:700; font-size:14.5px}
+.narr-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px}
+.narr-row:last-of-type{margin-bottom:0}
+.narr-row select{flex:1; font-size:13px; padding:6px 8px; border-radius:8px}
+.narr-btnrow{display:flex; gap:8px; margin-top:2px}
+.btn.small{padding:6px 12px; font-size:12.5px}
+.narr-status{margin-top:10px; padding-top:10px; border-top:1px solid var(--hair-2); color:var(--ink-soft); font-family:var(--mono); font-size:11.5px; min-height:16px}
+.narr-status b{color:var(--micro); font-weight:600}
+
+/* ---------- per-section "try asking your AI" chip ---------- */
+.askchip{
+  display:inline-flex; align-items:center; gap:7px; border:1.5px dashed var(--hair);
+  background:transparent; border-radius:999px; padding:6px 14px; font-family:var(--mono);
+  font-size:12.5px; color:var(--ink-soft); cursor:pointer; margin:6px 0 4px; transition:.15s;
+}
+.askchip:hover{border-color:var(--micro); color:var(--micro); border-style:solid}
+.askchip.copied{border-color:var(--resilient); color:var(--resilient); border-style:solid}
+
+/* ---------- remix this article ---------- */
+#remixFab{
+  position:fixed; left:20px; bottom:20px; z-index:70;
+  display:flex; align-items:center; gap:8px; border:none; cursor:pointer;
+  background:var(--card); color:var(--ink); border:1.5px solid var(--hair); box-shadow:var(--shadow);
+  border-radius:999px; padding:12px 18px; font-family:var(--body); font-weight:600; font-size:13.5px;
+}
+#remixFab:hover{border-color:var(--micro); color:var(--micro)}
+.remix-modalbox{background:var(--card); border-radius:var(--r); padding:26px; width:min(560px,100%); box-shadow:var(--shadow); max-height:82vh; overflow-y:auto}
+.remix-modalbox h4{margin:0 0 6px; font-family:var(--disp); font-weight:700; font-size:18px}
+.remix-ta{width:100%; font-family:var(--mono); font-size:12.5px; line-height:1.5; padding:14px; border-radius:10px; border:1.5px solid var(--hair); background:#FCFDFC; resize:vertical; margin-top:12px}
 </style>
+
 </head>
 <body>
 
@@ -179,6 +225,49 @@ footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1p
   </div>
 </header>
 
+<div id="narrator">
+  <div class="narr-panel" id="narrPanel" hidden>
+    <h4>Voice narration</h4>
+    <div class="narr-row">
+      <span>Narrate as I scroll</span>
+      <button id="narrOnOff" class="btn ghost small">Turn on</button>
+    </div>
+    <div class="narr-row">
+      <select id="narrVoice" aria-label="Choose a voice"></select>
+    </div>
+    <div class="narr-btnrow">
+      <button id="narrReplay" class="btn ghost small">Replay section</button>
+      <button id="narrPauseBtn" class="btn ghost small" disabled>Pause</button>
+    </div>
+    <div class="narr-status" id="narrStatus">Off — press "Turn on" to begin.</div>
+  </div>
+  <button id="narrFab" class="narr-fab" aria-label="Open voice narration controls" aria-expanded="false" title="Voice narration">🔊</button>
+</div>
+
+<button id="remixFab" title="Generate a remix prompt for your own AI tool">🧵 Remix this article</button>
+<div id="remixModalBg" class="modalbg" hidden>
+  <div class="remix-modalbox">
+    <h4>Remix this article</h4>
+    <p class="note">This copies a ready-made prompt to your clipboard — paste it into your own AI tool (Claude, ChatGPT, whatever you use) to remix this article. Nothing is sent anywhere from here; there's no API cost to this button.</p>
+    <div class="narr-row" style="margin-top:14px">
+      <span style="font-size:13.5px">Remix angle</span>
+      <select id="remixAngle" aria-label="Choose a remix angle">
+        <option value="simpler">Explain it even simpler (for a total beginner)</option>
+        <option value="deeper">Go deeper (add more real-world engineering detail)</option>
+        <option value="code">Add real code samples (Docker/Kubernetes YAML)</option>
+        <option value="quiz">Turn it into a self-test quiz</option>
+      </select>
+    </div>
+    <textarea id="remixPromptBox" class="remix-ta" rows="9" readonly></textarea>
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn accent" id="remixCopyBtn">Copy prompt</button>
+      <button class="btn ghost" id="remixCloseBtn">Close</button>
+    </div>
+    <div class="note" id="remixStatus" style="margin-top:8px"></div>
+  </div>
+</div>
+
+
 <main class="wrap">
 
 <!-- ============ SECTION 1 : WHAT IS CLOUD NATIVE ============ -->
@@ -200,6 +289,7 @@ footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1p
     <div class="pill-row" id="promisePills"></div>
     <div id="promiseDetail" class="callout" style="min-height:56px"></div>
   </div>
+  <button class="askchip" data-prompt="Explain the CNCF and why cloud native apps are built around open standards rather than one cloud provider's tools, with a simple Indian example.">💬 Try asking your AI ↗</button>
 </section>
 
 <!-- ============ SECTION 2 : ELASTICITY & SCALABILITY ============ -->
@@ -230,6 +320,7 @@ footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1p
       <div class="big-metric" id="idleMetric">0%<small>spare capacity right now</small></div>
     </div>
   </div>
+  <button class="askchip" data-prompt="Walk me through how Kubernetes' Horizontal Pod Autoscaler actually decides when to add or remove instances — what metrics does it watch, and how quickly does it react during a traffic spike?">💬 Try asking your AI ↗</button>
 </section>
 
 <!-- ============ SECTION 3 : INDEPENDENCE & MICROSERVICES ============ -->
@@ -251,6 +342,7 @@ footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1p
     <p style="margin-top:0; color:var(--ink-soft); font-size:15px">Each crate below is a microservice with its own version. Click "Ship update" on any one — notice the others don't even blink.</p>
     <div id="crateYard" style="display:flex; gap:14px; flex-wrap:wrap; margin-top:10px"></div>
   </div>
+  <button class="askchip" data-prompt="What are the real trade-offs of splitting an app into microservices — when does it actually help a small team, and when does it just add operational overhead?">💬 Try asking your AI ↗</button>
 </section>
 
 <!-- ============ SECTION 4 : NO DOWNTIME & IMMUTABLE INFRASTRUCTURE ============ -->
@@ -271,6 +363,7 @@ footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1p
     <svg id="rollSvg" viewBox="0 0 680 170" xmlns="http://www.w3.org/2000/svg" style="width:100%; margin-top:8px"></svg>
     <p id="rollCaption" style="font-size:14px; color:var(--ink-soft); margin:8px 0 0">Currently serving: <b>App v1.0</b> on 3 instances — 0% downtime so far.</p>
   </div>
+  <button class="askchip" data-prompt="Explain Kubernetes rolling updates vs blue-green vs canary deployments — what's the actual difference, and which one would you pick for a payments service?">💬 Try asking your AI ↗</button>
 </section>
 
 <!-- ============ SECTION 5 : RESILIENCY ============ -->
@@ -298,6 +391,7 @@ footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1p
     </div>
     <div class="big-metric" id="availMetric">99.9997%<small>yearly availability (A)</small></div>
   </div>
+  <button class="askchip" data-prompt="What is a circuit breaker pattern in microservices, and how is it different from just adding a retry with a timeout?">💬 Try asking your AI ↗</button>
 </section>
 
 <!-- ============ SECTION 6 : SECURITY ============ -->
@@ -312,6 +406,7 @@ footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1p
   <div class="callout">
     <b>Where security actually gets enforced:</b> mostly at two layers you'll meet in the next section — the <b>ingress gate</b> at the edge of the cluster, and <b>mutual TLS</b> between microservices, handled automatically by the service mesh so individual developers don't have to hand-write it into every crate.
   </div>
+  <button class="askchip" data-prompt="What is mutual TLS (mTLS) in simple terms, and why is it better for microservice-to-microservice security than a shared API key or password?">💬 Try asking your AI ↗</button>
 </section>
 
 <!-- ============ SECTION 7 : CONTAINERS, KUBERNETES & SERVICE MESH ============ -->
@@ -345,6 +440,7 @@ footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1p
   </div>
 
   <p>A service mesh runs a lightweight <b>proxy</b> alongside every microservice. Every request quietly passes through this proxy first — which is where encryption (mTLS), retries, circuit breaking and traffic metrics all get applied consistently, without any microservice's own code having to implement them. <b>Istio</b> is the best-known example; <b>Dapr</b> offers similar capabilities and adds more building blocks for the microservice's own runtime logic too.</p>
+  <button class="askchip" data-prompt="Compare Istio and Dapr for a small team running microservices on Kubernetes — which is simpler to adopt first, and why?">💬 Try asking your AI ↗</button>
 </section>
 
 <!-- ============ SECTION 8 : BUSINESS BENEFITS & CNCF LANDSCAPE ============ -->
@@ -355,6 +451,7 @@ footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1p
   <p>None of elasticity, resiliency or independence survive a budget review unless they translate into money. And they do, directly: elasticity means you pay for extra capacity only during the festival-sale week, not all year; independence means smaller, faster-moving teams instead of one large team blocking each other; no-downtime deploys mean lost-sales-from-an-outage stops being a recurring line item.</p>
 
   <p>The CNCF landscape — a large, constantly growing map of open-source projects (Kubernetes, Istio, Argo, Prometheus, OpenTelemetry, and hundreds more) — exists precisely so a team doesn't have to build any of this from scratch. The real skill isn't knowing that the landscape exists; it's picking the small subset of it that actually fits your app's requirements.</p>
+  <button class="askchip" data-prompt="For a mid-size Indian e-commerce startup, which 5 CNCF projects would actually be worth adopting first, in what order, and why?">💬 Try asking your AI ↗</button>
 </section>
 
 <!-- ============ SUMMARY ============ -->
@@ -387,6 +484,7 @@ footer{padding:60px 0 90px; color:var(--ink-soft); font-size:14px; border-top:1p
   </div>
 
   <p style="margin-top:26px; color:var(--ink-soft); font-size:15px">Next in this series: how <b>Dapr</b> extends the service-mesh idea further into the microservice's own runtime — state management, pub/sub and bindings included.</p>
+  <button class="askchip" data-prompt="Give me a one-page checklist to audit whether an existing app is actually cloud native or just 'lifted and shifted' onto the cloud.">💬 Try asking your AI ↗</button>
 </section>
 
 </main>
@@ -982,6 +1080,229 @@ var ResDemo = (function(){
   renderLikeButtons();
   restoreLikedState();
   if(CONFIGURED && window.supabase) initClient();
+})();
+
+/* =========================================================
+   Voice narrator — Web Speech API, no backend, no cost
+   ========================================================= */
+(function(){
+  var fab=document.getElementById('narrFab'), panel=document.getElementById('narrPanel'); if(!fab) return;
+  var supported = ('speechSynthesis' in window);
+
+  var TITLES={
+    top:'Introduction', s1:'The idea', s2:'Elasticity & scalability', s3:'Independence & microservices',
+    s4:'No downtime & immutable infra', s5:'Resiliency', s6:'Security',
+    s7:'Containers, Kubernetes & mesh', s8:'Business benefits', s9:'Summary'
+  };
+
+  var SCRIPTS={
+    top:"Welcome to Groundwork. This one's about cloud native applications — why just running your app on AWS or Azure doesn't automatically make it cloud native, and what actually does. We'll use a shipping port as our running picture throughout.",
+    s1:"Think of moving into a modern high-rise but still using your old diesel generator instead of the building's power backup. That's most apps before they go cloud native — technically on the cloud, but not using anything it offers. Tap the six pills on screen to hear each promise in plain language.",
+    s2:"Picture a container port opening extra berths right before a festival rush, then quietly closing them once the crowd thins out. That's elasticity. Try dragging the traffic slider below — watch the port add berths live, computed from how much traffic is coming in versus how much each berth can handle.",
+    s3:"A joint family sharing one kitchen has to coordinate every recipe change. A tiffin service with separate cooks for dal, sabzi and roti doesn't. That second picture is microservices — small independent crates instead of one giant cargo hold. Go ahead and click 'Ship update' on any crate below; notice the others don't react at all.",
+    s4:"Old deployments patch a running server in place, like repainting a ship at sea. Cloud native deployments build a whole new ship, prove it's seaworthy, and only then send the old one to be scrapped — a rolling update. Press the deploy button below and watch each instance flip over one at a time, with zero downtime.",
+    s5:"Failures aren't rare in distributed systems, they're guaranteed. What matters is whether one crane breaking down shuts the whole port, or just that one crane. Click on Microservice C in the diagram to simulate it failing, then play with the sliders to see how that translates into a yearly uptime percentage.",
+    s6:"The fastest cranes in the world don't matter if anyone can walk through an unguarded gate. Cloud native security means every microservice proves who it is, and every hop between them is encrypted by default — not left to individual developer discipline.",
+    s7:"Containers are the crate, Kubernetes is the port authority deciding where each crate goes, and a service mesh is the radio channel that lets crates talk safely. Toggle the mesh on and off in the diagram below to see a proxy layer appear between the two services.",
+    s8:"Every technical promise in this article is really a cost argument in disguise — elasticity means you only pay for the festival-week surge, not all year; independence means smaller teams that don't block each other.",
+    s9:"Quick recap: elasticity opens and closes berths with traffic, independence means small separately-shippable crates, no downtime means swapping ships instead of repainting them, and security means every crate proves itself at the gate. Watch out for the classic trap — running on the cloud isn't the same as being cloud native."
+  };
+
+  var narrationOn=false, currentId=null, lastVisible='top';
+
+  function setSpeakingUI(id,speaking){ fab.classList.toggle('speaking', !!speaking); }
+  function statusIdle(){ el('narrStatus').textContent = narrationOn ? 'On — narrating as you scroll.' : 'Off — press "Turn on" to begin.'; }
+  function statusSpeaking(id){ el('narrStatus').innerHTML = 'Speaking — <b>'+(TITLES[id]||id)+'</b>'; }
+
+  function getSelectedVoice(){
+    if(!supported) return null;
+    var val=el('narrVoice').value, voices=window.speechSynthesis.getVoices();
+    for(var i=0;i<voices.length;i++){ if(voices[i].name+'|'+voices[i].lang===val) return voices[i]; }
+    return voices[0]||null;
+  }
+  function populateVoices(){
+    if(!supported) return;
+    var voices=window.speechSynthesis.getVoices(); if(!voices.length) return;
+    var sel=el('narrVoice'); if(sel.options.length) return;
+    var en=voices.filter(function(v){return /^en/i.test(v.lang);});
+    var rest=voices.filter(function(v){return !/^en/i.test(v.lang);});
+    (en.length?en.concat(rest):voices).forEach(function(v){
+      var o=document.createElement('option'); o.value=v.name+'|'+v.lang; o.textContent=v.name+' ('+v.lang+')';
+      sel.appendChild(o);
+    });
+  }
+  if(supported){ populateVoices(); window.speechSynthesis.onvoiceschanged=populateVoices; }
+
+  function speak(id){
+    if(!supported) return;
+    var text=SCRIPTS[id]; if(!text) return;
+    window.speechSynthesis.cancel();
+    var u=new SpeechSynthesisUtterance(text);
+    var v=getSelectedVoice(); if(v) u.voice=v;
+    u.rate=0.98; u.pitch=1;
+    u.onstart=function(){ setSpeakingUI(id,true); statusSpeaking(id); el('narrPauseBtn').disabled=false; el('narrPauseBtn').textContent='Pause'; };
+    u.onend=function(){ setSpeakingUI(id,false); statusIdle(); };
+    u.onerror=function(){ setSpeakingUI(id,false); statusIdle(); };
+    window.speechSynthesis.speak(u);
+    currentId=id;
+  }
+
+  function turnOn(){
+    narrationOn=true; el('narrOnOff').textContent='Turn off'; fab.classList.add('active'); statusIdle();
+    if(lastVisible) speak(lastVisible);
+  }
+  function turnOff(){
+    narrationOn=false;
+    if(supported) window.speechSynthesis.cancel();
+    el('narrOnOff').textContent='Turn on'; fab.classList.remove('active');
+    setSpeakingUI(null,false);
+    el('narrPauseBtn').disabled=true; el('narrPauseBtn').textContent='Pause';
+    currentId=null; statusIdle();
+  }
+
+  if(!supported){
+    statusIdle();
+    el('narrStatus').textContent="Voice narration isn't supported in this browser.";
+    el('narrOnOff').disabled=true; el('narrReplay').disabled=true; el('narrPauseBtn').disabled=true; el('narrVoice').disabled=true;
+  } else { statusIdle(); }
+
+  on('narrFab','click',function(){
+    var hidden=panel.hasAttribute('hidden');
+    if(hidden){ panel.removeAttribute('hidden'); fab.setAttribute('aria-expanded','true'); }
+    else { panel.setAttribute('hidden',''); fab.setAttribute('aria-expanded','false'); }
+  });
+  on('narrOnOff','click',function(){ narrationOn?turnOff():turnOn(); });
+  on('narrReplay','click',function(){ var id=currentId||lastVisible; if(id) speak(id); });
+  on('narrPauseBtn','click',function(){
+    if(!supported||!window.speechSynthesis.speaking) return;
+    if(window.speechSynthesis.paused){ window.speechSynthesis.resume(); el('narrPauseBtn').textContent='Pause'; }
+    else { window.speechSynthesis.pause(); el('narrPauseBtn').textContent='Resume'; }
+  });
+
+  var secs=document.querySelectorAll('section.s, .hero');
+  if('IntersectionObserver' in window){
+    var nio=new IntersectionObserver(function(es){
+      es.forEach(function(e){
+        if(e.isIntersecting){
+          lastVisible=e.target.id || 'top';
+          if(narrationOn && lastVisible!==currentId) speak(lastVisible);
+        }
+      });
+    },{rootMargin:'-25% 0px -55% 0px'});
+    for(var i=0;i<secs.length;i++) nio.observe(secs[i]);
+  }
+})();
+
+/* =========================================================
+   Per-section "Try asking your AI" chips — clipboard only, zero API cost
+   ========================================================= */
+(function(){
+  function copyText(text){
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      return navigator.clipboard.writeText(text);
+    }
+    // fallback for file:// or older browsers where the async Clipboard API is unavailable
+    return new Promise(function(resolve,reject){
+      try{
+        var ta=document.createElement('textarea');
+        ta.value=text; ta.style.position='fixed'; ta.style.opacity='0';
+        document.body.appendChild(ta); ta.focus(); ta.select();
+        var ok=document.execCommand('copy');
+        document.body.removeChild(ta);
+        ok?resolve():reject(new Error('execCommand copy failed'));
+      }catch(e){ reject(e); }
+    });
+  }
+  var chips=document.querySelectorAll('.askchip');
+  chips.forEach(function(chip){
+    var original=chip.textContent;
+    chip.addEventListener('click',function(){
+      var prompt=chip.getAttribute('data-prompt');
+      copyText(prompt).then(function(){
+        chip.classList.add('copied');
+        chip.textContent='✓ Copied — paste into your AI tool';
+        setTimeout(function(){ chip.classList.remove('copied'); chip.textContent=original; }, 2200);
+      }).catch(function(){
+        chip.textContent='Could not copy — select and copy manually';
+        setTimeout(function(){ chip.textContent=original; }, 2200);
+      });
+    });
+  });
+})();
+
+/* =========================================================
+   Remix this article — generates a copy-paste prompt, zero API cost
+   ========================================================= */
+(function(){
+  var fab=document.getElementById('remixFab');
+  var modalBg=document.getElementById('remixModalBg');
+  var promptBox=document.getElementById('remixPromptBox');
+  var angleSelect=document.getElementById('remixAngle');
+  var copyBtn=document.getElementById('remixCopyBtn');
+  var closeBtn=document.getElementById('remixCloseBtn');
+  var status=document.getElementById('remixStatus');
+  if(!fab) return;
+
+  var ARTICLE_TITLE='Cloud Native Applications, from First Principles';
+  var SECTION_LIST=[
+    'What is cloud native (vs. just running on the cloud)',
+    'Elasticity & scalability',
+    'Independence & microservices',
+    'No downtime & immutable infrastructure',
+    'Resiliency',
+    'Security',
+    'Containers, Kubernetes & service mesh',
+    'Business benefits & the CNCF landscape',
+    'Summary & common pitfalls'
+  ];
+
+  var ANGLES={
+    simpler: "Rewrite it for a complete beginner who has never touched a terminal — remove all jargon, keep the shipping-port analogy but make it even more concrete, and add a one-line 'why should I care' before every section.",
+    deeper: "Keep the same structure and analogies, but go noticeably deeper on the engineering detail in each section — real Kubernetes object names (Deployment, HPA, Service), real Istio config concepts, and realistic numbers.",
+    code: "Keep the plain-language explanations as they are, but add a short, real, working code sample after each relevant section — a Dockerfile, a Kubernetes Deployment/HPA YAML, and a minimal Istio VirtualService — so it can be tried locally.",
+    quiz: "Turn this into a self-test quiz: for every section, write 2 multiple-choice questions and 1 short-answer question that check whether the reader actually understood the idea, not just the analogy."
+  };
+
+  function buildPrompt(){
+    var angleKey=angleSelect.value;
+    var lines=[];
+    lines.push('I\'m remixing an article called "'+ARTICLE_TITLE+'".');
+    lines.push('');
+    lines.push('It currently covers these sections, in this order:');
+    SECTION_LIST.forEach(function(s,i){ lines.push((i+1)+'. '+s); });
+    lines.push('');
+    lines.push('Remix request: '+ANGLES[angleKey]);
+    lines.push('');
+    lines.push('Keep it a single self-contained piece (no external files needed), plain language suitable for Indian readers new to the topic, and keep the shipping-port analogy running through it unless the remix angle above says otherwise.');
+    return lines.join('\n');
+  }
+
+  function refresh(){ promptBox.value=buildPrompt(); status.textContent=''; }
+
+  function openModal(){ modalBg.removeAttribute('hidden'); refresh(); }
+  function closeModal(){ modalBg.setAttribute('hidden',''); }
+
+  fab.addEventListener('click', openModal);
+  closeBtn.addEventListener('click', closeModal);
+  angleSelect.addEventListener('change', refresh);
+
+  copyBtn.addEventListener('click', function(){
+    var text=promptBox.value;
+    function fallbackCopy(){
+      promptBox.focus(); promptBox.select();
+      try{
+        var ok=document.execCommand('copy');
+        status.textContent = ok ? 'Copied — paste it into your AI tool.' : 'Could not copy automatically — select the text above and copy it manually.';
+      }catch(e){ status.textContent='Could not copy automatically — select the text above and copy it manually.'; }
+    }
+    if(navigator.clipboard && navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){
+        status.textContent='Copied — paste it into your AI tool.';
+      }).catch(fallbackCopy);
+    } else {
+      fallbackCopy();
+    }
+  });
 })();
 </script>
 </body>

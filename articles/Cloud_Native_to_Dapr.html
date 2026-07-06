@@ -58,6 +58,14 @@ pre .yk{color:#8FBEEF} pre .yv{color:#F2C48D} pre .yc{color:#6E8894}
 #podmeter .lbl b{color:var(--side); font-weight:600}
 @media (max-width:640px){ #podmeter .lbl{display:none} }
 
+/* ---------- back button ---------- */
+#backBtn{display:inline-flex; align-items:center; gap:5px; font-family:var(--disp); font-weight:700;
+  font-size:13px; color:var(--ink-soft); text-decoration:none; border:1.5px solid var(--hair);
+  border-radius:999px; padding:5px 13px; background:var(--card); white-space:nowrap; flex-shrink:0;
+  transition:border-color .15s, color .15s}
+#backBtn:hover{border-color:var(--ink); color:var(--ink)}
+@media (max-width:480px){ #backBtn .back-label{display:none} }
+
 /* ---------- left rail nav ---------- */
 #rail{position:fixed; left:18px; top:50%; transform:translateY(-50%); z-index:50; display:flex; flex-direction:column; gap:2px}
 #rail a{display:flex; align-items:center; gap:8px; text-decoration:none; color:var(--ink-soft); font-family:var(--mono); font-size:11px; padding:5px 9px; border-radius:8px; max-width:172px}
@@ -183,6 +191,29 @@ canvas.plot{width:100%; height:auto; display:block; background:#FCFDFC; border:1
 
 footer{max-width:840px; margin:30px auto 0; padding:34px 20px 60px; border-top:1px solid var(--hair); color:var(--ink-soft); font-size:13.5px}
 
+/* ---------- per-section AI prompt chips ---------- */
+.ai-prompts{margin:28px 0 0; padding-top:18px; border-top:1px dashed var(--hair)}
+.ai-prompts .ai-label{font-family:var(--mono); font-size:11px; letter-spacing:.13em; text-transform:uppercase; color:var(--ink-soft); margin-bottom:10px}
+.ai-chip-row{display:flex; flex-wrap:wrap; gap:8px}
+.ai-chip{
+  font-family:var(--body); font-size:13px; color:var(--side);
+  background:var(--side-soft); border:1.5px solid var(--hair);
+  border-radius:999px; padding:7px 15px; cursor:pointer; text-align:left;
+  transition:background .15s, border-color .15s, color .15s; max-width:100%;
+}
+.ai-chip:hover{background:var(--side); color:#fff; border-color:var(--side)}
+.ai-chip.copied{background:var(--infra); color:#fff; border-color:var(--infra); cursor:default}
+
+/* ---------- remix block ---------- */
+.remix-wrap{
+  margin:32px 0 0; padding:22px 24px;
+  background:var(--side-soft); border:1.5px solid var(--hair);
+  border-radius:var(--r);
+}
+.remix-wrap h4{font-family:var(--disp); font-weight:800; font-size:17px; margin:0 0 6px; color:var(--side)}
+.remix-wrap p{font-size:14px; color:var(--ink-soft); margin:0 0 16px}
+.remix-wrap .remix-feedback{font-family:var(--mono); font-size:12px; color:var(--infra); height:16px; margin-top:10px; min-height:16px}
+
 /* ---------- narrator module CSS ---------- */
 #narrator{position:fixed; right:20px; bottom:20px; z-index:70; display:flex; flex-direction:column; align-items:flex-end; gap:10px}
 .narr-fab{
@@ -193,7 +224,7 @@ footer{max-width:840px; margin:30px auto 0; padding:34px 20px 60px; border-top:1
 .narr-fab:hover{background:#0d1a1f}
 .narr-fab.active{background:var(--model)}
 .narr-fab.speaking{animation:narrpulse 1.4s ease-in-out infinite}
-@keyframes narrpulse{0%,100%{box-shadow:0 0 0 0 rgba(184,100,27,.45)}50%{box-shadow:0 0 0 10px rgba(184,100,27,0)}}
+@keyframes narrpulse{0%,100%{box-shadow:0 0 0 0 rgba(255,107,53,.45)}50%{box-shadow:0 0 0 10px rgba(255,107,53,0)}}
 @media (prefers-reduced-motion:reduce){ .narr-fab.speaking{animation:none} }
 .narr-panel{
   width:270px; background:var(--card); border:1px solid var(--hair); border-radius:var(--r);
@@ -239,6 +270,7 @@ footer{max-width:840px; margin:30px auto 0; padding:34px 20px 60px; border-top:1
 
 <div id="topbar">
   <div class="inner">
+    <a id="backBtn" href="javascript:history.back()" aria-label="Go back">← <span class="back-label">Back</span></a>
     <div class="brand">Groundwork <span>/ Cloud Native to Dapr</span></div>
     <div id="podmeter" aria-hidden="true">
       <span class="lbl">your service:</span>
@@ -317,6 +349,15 @@ footer{max-width:840px; margin:30px auto 0; padding:34px 20px 60px; border-top:1
     <p><b>Elasticity</b> — on a normal day, two instances of the storefront handle all traffic comfortably. On a sale day, two instances fall over — so the platform notices the queue building and adds instances automatically, then removes them once the peak passes. Nobody paged anyone.</p>
     <p><b>Resiliency</b> — a single checkout request touches the catalog, the cart, and the payment service. If payment goes down, a resilient storefront doesn't fail the whole request — it degrades gracefully, shows a clear "try again shortly" message on checkout, and keeps the catalog and cart online for everyone else.</p>
   </div>
+
+  <div class="ai-prompts">
+    <div class="ai-label">Try asking your AI</div>
+    <div class="ai-chip-row">
+      <button class="ai-chip" data-prompt="Give me three real companies that went cloud-native and explain specifically what changed in their architecture — not just 'they moved to the cloud' but what structural decisions they made.">Give me real cloud-native case studies with architectural detail</button>
+      <button class="ai-chip" data-prompt="What is the difference between high availability and fault tolerance? Can you give me a concrete example where a system has one but not the other?">High availability vs fault tolerance — what's the real difference?</button>
+      <button class="ai-chip" data-prompt="Why does microservices independence matter so much? What goes wrong when teams can't deploy independently, and how does Conway's Law relate to this?">Why does deployment independence matter so much?</button>
+    </div>
+  </div>
 </section>
 
 <section id="s2" class="chapter reveal">
@@ -375,6 +416,15 @@ footer{max-width:840px; margin:30px auto 0; padding:34px 20px 60px; border-top:1
     <span class="tag">From cloud-native to Kubernetes-native</span>
     <p>Hybrid cloud is supposed to avoid lock-in by letting you fail over between providers — but each provider ships its own CLI, its own service discovery, its own event protocol, so deploying the same app everywhere <em>automatically</em> was effectively impossible. Standardizing on Kubernetes gives every provider the same portable deployment surface. Kubernetes-native isn't a departure from cloud-native — it's cloud-native with one concrete, common substrate underneath.</p>
   </div>
+
+  <div class="ai-prompts">
+    <div class="ai-label">Try asking your AI</div>
+    <div class="ai-chip-row">
+      <button class="ai-chip" data-prompt="Walk me through exactly what happens inside Kubernetes when a pod crashes — from the kubelet detecting it to a replacement pod being scheduled and passing its readiness probe. Include which Kubernetes components are involved at each step.">Walk me through exactly what happens when a Kubernetes pod crashes</button>
+      <button class="ai-chip" data-prompt="What is the difference between a Kubernetes Deployment, StatefulSet, and DaemonSet? Give me a concrete example of when you would use each one.">Deployment vs StatefulSet vs DaemonSet — when do I use which?</button>
+      <button class="ai-chip" data-prompt="Why does Kubernetes use etcd as its backing store? What would break if etcd went down, and how do production clusters protect against that?">Why does Kubernetes use etcd and what happens if it goes down?</button>
+    </div>
+  </div>
 </section>
 
 <section id="s3" class="chapter reveal">
@@ -419,6 +469,15 @@ footer{max-width:840px; margin:30px auto 0; padding:34px 20px 60px; border-top:1
     <div class="gcard"><div class="t e">Vendor lock-in</div><p>The SDK binds your code to one provider's API. Switching a queue, database, or secret store means rewriting and redeploying every service that touches it.</p></div>
     <div class="gcard"><div class="t e">Duplication</div><p>The same plumbing is embedded and version-pinned in every service. One upstream change forces coordinated updates across the whole fleet at once.</p></div>
     <div class="gcard"><div class="t e">Polyglot tax</div><p>Each language needs its own port of the library. Java, Go, .NET, and Python teams re-solve the same problem in parallel, independently.</p></div>
+  </div>
+
+  <div class="ai-prompts">
+    <div class="ai-label">Try asking your AI</div>
+    <div class="ai-chip-row">
+      <button class="ai-chip" data-prompt="Before Dapr existed, how did Netflix, Uber, and other large microservices companies solve the cross-cutting concerns problem (service discovery, retries, circuit breaking)? What did they build themselves and what were the downsides?">How did Netflix and Uber solve these problems before tools like Dapr?</button>
+      <button class="ai-chip" data-prompt="What is the difference between a service mesh (like Istio or Linkerd) and a distributed runtime like Dapr? When would you choose one over the other, and can you use both together?">Service mesh vs distributed runtime — what's the difference?</button>
+      <button class="ai-chip" data-prompt="Show me what a real polyglot microservices codebase looks like before adopting Dapr — show the duplicated retry/state/messaging code in Java, Go, and Python, and then show how it simplifies after.">Show me the actual code duplication before and after Dapr</button>
+    </div>
   </div>
 </section>
 
@@ -493,6 +552,15 @@ metadata:
     <pre id="backendYaml"></pre>
     <div class="readout"><span>Application code changed: <b id="backendAppChanged" style="color:var(--infra)">0 lines</b></span></div>
   </div>
+
+  <div class="ai-prompts">
+    <div class="ai-label">Try asking your AI</div>
+    <div class="ai-chip-row">
+      <button class="ai-chip" data-prompt="Explain the sidecar pattern in depth. What are its advantages and disadvantages compared to embedding logic in the app, and what are the latency implications of having an extra process in the call path?">Deep dive on the sidecar pattern — trade-offs and latency implications</button>
+      <button class="ai-chip" data-prompt="How does Dapr handle component versioning? If I'm running Dapr 1.12 in production and want to upgrade to 1.14, what's the migration path and what could break?">How does Dapr versioning and upgrades work in production?</button>
+      <button class="ai-chip" data-prompt="Walk me through writing a Dapr component YAML for Azure Service Bus as a pub/sub broker. What fields are required, what are the authentication options, and how does Dapr manage the connection lifecycle?">Walk me through a real Dapr component YAML for Azure Service Bus</button>
+    </div>
+  </div>
 </section>
 
 <section id="s5" class="chapter reveal">
@@ -538,6 +606,15 @@ metadata:
 
   <h3>Observability</h3>
   <p>All traffic already flows through sidecars, so Dapr emits logs, metrics, and traces automatically, in the OpenTelemetry format — pointed at Zipkin, Jaeger, or Prometheus/Grafana. Nobody had to instrument a single service by hand for the sidecar's own hops to become visible.</p>
+
+  <div class="ai-prompts">
+    <div class="ai-label">Try asking your AI</div>
+    <div class="ai-chip-row">
+      <button class="ai-chip" data-prompt="Write me a complete working example of Dapr service-to-service invocation between two Python services — include the Dapr component YAML, both service files, and the exact commands to run them locally.">Give me a complete working Dapr service invocation example in Python</button>
+      <button class="ai-chip" data-prompt="How does Dapr's circuit breaker work? What's the difference between a closed, open, and half-open state, and how do I configure the thresholds in a Dapr resiliency policy YAML?">How does Dapr's circuit breaker actually work — show me the YAML config</button>
+      <button class="ai-chip" data-prompt="What's the difference between Dapr's pub/sub building block and just using a message queue directly? When does the abstraction cost more than it saves?">When does Dapr pub/sub add value vs just using a queue directly?</button>
+    </div>
+  </div>
 </section>
 
 <section id="s6" class="chapter reveal">
@@ -602,6 +679,15 @@ metadata:
     </div>
     <div class="urlout" id="urlOut"></div>
   </div>
+
+  <div class="ai-prompts">
+    <div class="ai-label">Try asking your AI</div>
+    <div class="ai-chip-row">
+      <button class="ai-chip" data-prompt="What does 'dapr init' actually install on my machine? List every process it starts, every port it opens, and what each one does.">What does 'dapr init' actually install — list every process and port</button>
+      <button class="ai-chip" data-prompt="My Dapr service invocation call is failing with a 500 error. Walk me through how to debug this step by step — what logs to check, what the Dapr dashboard shows, and how to tell if the problem is in my app vs. the sidecar.">Walk me through debugging a failing Dapr service call step by step</button>
+      <button class="ai-chip" data-prompt="How does Kubernetes inject the Dapr sidecar automatically? What annotation triggers it, what mutating webhook does the injection, and how can I verify the sidecar was injected correctly?">How does Kubernetes automatically inject the Dapr sidecar?</button>
+    </div>
+  </div>
 </section>
 
 <section id="s7" class="chapter reveal">
@@ -641,12 +727,28 @@ metadata:
     <div class="gcard"><div class="t s">Dapr quickstarts</div><p><a href="https://github.com/dapr/quickstarts" target="_blank" rel="noopener">github.com/dapr/quickstarts</a></p></div>
   </div>
   <p class="note">Before next session: install the Dapr CLI and run <code>dapr init</code> in self-hosted mode, run the service-invocation and state quickstarts, and deploy the Employee &amp; Department sample to minikube.</p>
+
+  <div class="ai-prompts">
+    <div class="ai-label">Try asking your AI</div>
+    <div class="ai-chip-row">
+      <button class="ai-chip" data-prompt="What are the real performance implications of the Dapr sidecar pattern? How much latency does an extra localhost hop add, how does this compare to a service mesh, and at what scale does it become a concern?">What are the real performance costs of the sidecar pattern?</button>
+      <button class="ai-chip" data-prompt="I have an existing Spring Boot application that talks directly to Redis for state and RabbitMQ for messaging. Walk me through a step-by-step migration plan to Dapr — which pieces to move first and how to do it without a big-bang rewrite.">Walk me through migrating an existing Spring Boot app to use Dapr</button>
+      <button class="ai-chip" data-prompt="How does Dapr compare to alternatives like Envoy with an application SDK, or building your own internal platform team abstractions? When does adopting Dapr make sense vs. rolling something custom?">Dapr vs alternatives — when does adopting it actually make sense?</button>
+    </div>
+  </div>
+
+  <div class="remix-wrap">
+    <h4>Remix this article</h4>
+    <p>Copy a prompt to your AI tool to create your own version — go deeper on one section, adapt it to your stack, or remix it for a different runtime like Actor Model, gRPC, or WebAssembly.</p>
+    <button class="btn orange" id="remixBtn">📋 Copy remix prompt</button>
+    <div class="remix-feedback" id="remixFeedback"></div>
+  </div>
 </section>
 
 <section id="comments" class="chapter reveal">
   <span class="eyebrow">Join the discussion</span>
   <h2>Comments</h2>
-  <p class="note" id="commentsConfigNote" hidden>Comments and likes aren't connected to a backend yet — search this file for "SUPABASE_URL" for setup steps. They'll still work on this screen, but won't be saved or shown to other visitors until that's done.</p>
+  <p class="note" id="commentsConfigNote" hidden>Comments and likes aren't connected to a backend yet — open <code>config.js</code> and fill in your Supabase URL and anon key. They'll still work on this screen, but won't be saved or shown to other visitors until that's done.</p>
   <div class="panel demo">
     <span class="tag">Leave a comment on the chapter</span>
     <textarea id="cBody" class="ctextarea" rows="3" placeholder="Ask a question, share what clicked for you…"></textarea>
@@ -694,12 +796,13 @@ metadata:
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer onload="window.__sbReady && window.__sbReady()"></script>
+<script src="config.js"></script>
 <script>
-var CONFIG = { 
-  SUPABASE_URL: 'https://gmcbnnsgpqvboatqjszb.supabase.co',
-  SUPABASE_ANON_KEY: 'sb_publishable_ta8TNaIyn-0XHyqn3Cfh7A_iQ2sgvFu',
-  ARTICLE_ID:'cloud-native-to-dapr' 
-};
+/* CONFIG is loaded from config.js — see that file to set SUPABASE_URL, SUPABASE_ANON_KEY, ARTICLE_ID */
+if (typeof CONFIG === 'undefined') {
+  console.warn('config.js not found or CONFIG not defined — engagement features will run in offline mode.');
+  window.CONFIG = { SUPABASE_URL:'', SUPABASE_ANON_KEY:'', ARTICLE_ID:'cloud-native-to-dapr' };
+}
 
 function el(id){ return document.getElementById(id); }
 function on(id,ev,fn){ var e=el(id); if(e) e.addEventListener(ev,fn); }
@@ -822,7 +925,7 @@ var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:co
 /* ---------------- s2: overhead plot ---------------- */
 (function(){
   var canvas = el('overheadPlot'); if(!canvas) return;
-  var ctx = canvas.getContext('2d');
+  var ctx = canvas.getContext('2d'); if(!ctx) return;
   var GUEST_OS_MB = 700; // representative fixed guest-OS overhead per VM instance
   function draw(n){
     var w=canvas.width, h=canvas.height; ctx.clearRect(0,0,w,h);
@@ -886,7 +989,7 @@ var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:co
 /* ---------------- s3: polyglot tax plot ---------------- */
 (function(){
   var canvas = el('taxPlot'); if(!canvas) return;
-  var ctx = canvas.getContext('2d');
+  var ctx = canvas.getContext('2d'); if(!ctx) return;
   function draw(N,L){
     var w=canvas.width,h=canvas.height; ctx.clearRect(0,0,w,h);
     var libCount = 7*L, sideCount = 7;
@@ -938,7 +1041,7 @@ var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:co
 /* ---------------- s5: retry probability plot ---------------- */
 (function(){
   var canvas = el('retryPlot'); if(!canvas) return;
-  var ctx = canvas.getContext('2d');
+  var ctx = canvas.getContext('2d'); if(!ctx) return;
   function draw(p,k){
     var w=canvas.width,h=canvas.height; ctx.clearRect(0,0,w,h);
     var padL=44,padB=28,padT=14,padR=14, plotW=w-padL-padR, plotH=h-padT-padB;
@@ -1161,7 +1264,7 @@ var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:co
   }
   window.__sbReady=initClient;
 
-  var LS_EMAIL='groundwork_email', LS_NAME='groundwork_name';
+  var LS_EMAIL='downhill_email', LS_NAME='downhill_name';
   function getIdentity(){
     try{ var e=localStorage.getItem(LS_EMAIL); return e?{email:e,name:localStorage.getItem(LS_NAME)||''}:null; }
     catch(err){ return null; }
@@ -1215,7 +1318,7 @@ var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:co
     btn.querySelector('.hrt').textContent='❤';
     var cnt=btn.querySelector('.cnt');
     cnt.textContent=(parseInt(cnt.textContent,10)||0)+1;
-    try{ localStorage.setItem('groundwork_liked_'+CONFIG.ARTICLE_ID+'_'+sectionId,'1'); }catch(e){}
+    try{ localStorage.setItem('downhill_liked_'+CONFIG.ARTICLE_ID+'_'+sectionId,'1'); }catch(e){}
     if(CONFIGURED && sb){
       sb.from('likes').insert({article_id:CONFIG.ARTICLE_ID, section_id:sectionId, email:id.email}).then(function(res){
         if(res && res.error && !/duplicate/i.test(res.error.message||'')) console.warn('like failed', res.error);
@@ -1227,7 +1330,7 @@ var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:co
     for(var i=0;i<btns.length;i++){
       var sid=btns[i].getAttribute('data-sec');
       try{
-        if(localStorage.getItem('groundwork_liked_'+CONFIG.ARTICLE_ID+'_'+sid)==='1'){
+        if(localStorage.getItem('downhill_liked_'+CONFIG.ARTICLE_ID+'_'+sid)==='1'){
           btns[i].classList.add('liked'); btns[i].querySelector('.hrt').textContent='❤';
         }
       }catch(e){}
@@ -1293,6 +1396,86 @@ var C = { ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:co
   renderLikeButtons();
   restoreLikedState();
   if(CONFIGURED && window.supabase) initClient();
+})();
+
+/* ---------------- per-section AI prompt chips + Remix this article ---------------- */
+(function(){
+  /* clipboard helper — handles both navigator.clipboard (https) and execCommand fallback (file://) */
+  function copyText(text, onDone, onFail) {
+    if (navigator.clipboard && window.isSecureContext) {
+      navigator.clipboard.writeText(text).then(onDone, function() { execFallback(text, onDone, onFail); });
+    } else {
+      execFallback(text, onDone, onFail);
+    }
+  }
+  function execFallback(text, onDone, onFail) {
+    var ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0';
+    document.body.appendChild(ta); ta.focus(); ta.select();
+    try { document.execCommand('copy') ? onDone() : onFail(); } catch(e) { onFail(); }
+    document.body.removeChild(ta);
+  }
+
+  /* prompt chips — one click copies, chip turns green briefly */
+  document.querySelectorAll('.ai-chip').forEach(function(chip) {
+    chip.addEventListener('click', function() {
+      if (chip.classList.contains('copied')) return;
+      var prompt = chip.getAttribute('data-prompt');
+      var original = chip.textContent;
+      copyText(prompt,
+        function() {
+          chip.textContent = '✓ Copied!'; chip.classList.add('copied');
+          setTimeout(function() { chip.textContent = original; chip.classList.remove('copied'); }, 2000);
+        },
+        function() { chip.textContent = 'Copy failed'; setTimeout(function() { chip.textContent = original; }, 2000); }
+      );
+    });
+  });
+
+  /* Remix this article */
+  var remixBtn = el('remixBtn'); if(!remixBtn) return;
+  var REMIX_PROMPT = [
+    'You are going to help me create an interactive, from-first-principles technical article in the style of Groundwork.',
+    '',
+    'The reference article is "Cloud Native to Dapr" — it covers:',
+    '  • Why cloud-native architecture matters (scalability, resilience, elasticity, always-on, security, deployment independence)',
+    '  • How containers and Kubernetes solve scheduling, isolation, and self-healing — but stop at the container boundary',
+    '  • The seven cross-cutting concerns every microservice independently has to solve: service invocation, state, pub/sub, secrets, bindings, resiliency, observability',
+    '  • How Dapr\'s sidecar pattern moves those concerns outside the compiled code into a separate pluggable runtime process',
+    '  • Dapr\'s building blocks in detail, with the component model (swap backends via YAML, never via app code)',
+    '  • How to run Dapr in self-hosted and Kubernetes mode, with a step-through demo of a two-service call',
+    '',
+    'TASK: Create a similar article for a DIFFERENT distributed-systems or cloud-infrastructure topic of my choice.',
+    '',
+    'Follow this structure for the new article:',
+    '  1. Plain-language explanation: what problem this technology solves and why it exists',
+    '  2. A concrete analogy rooted in everyday experience (not tech metaphors)',
+    '  3. An interactive demo — describe what sliders/controls/visualisations would help a reader explore the concept hands-on',
+    '  4. A "before vs after" comparison showing what changes when the technology is adopted',
+    '  5. Common pitfalls and a recap of key takeaways',
+    '',
+    'Writing style:',
+    '  • Build from first principles — assume the reader knows backend development but not this specific topic',
+    '  • Use short declarative sentences; every paragraph earns its place',
+    '  • Analogies drawn from everyday Indian tech-industry or urban life work well for this audience',
+    '  • No unexplained jargon; define every term the first time it appears',
+    '',
+    'Tell me the topic you want to cover, and I will write the full article outline.'
+  ].join('\n');
+
+  remixBtn.addEventListener('click', function() {
+    var feedback = el('remixFeedback');
+    copyText(REMIX_PROMPT,
+      function() {
+        remixBtn.textContent = '✓ Prompt copied!';
+        if(feedback) feedback.textContent = 'Paste it into your AI tool to start remixing.';
+        setTimeout(function() { remixBtn.textContent = '📋 Copy remix prompt'; if(feedback) feedback.textContent=''; }, 3500);
+      },
+      function() {
+        if(feedback) feedback.textContent = 'Could not copy — try a different browser or copy manually.';
+      }
+    );
+  });
 })();
 </script>
 
