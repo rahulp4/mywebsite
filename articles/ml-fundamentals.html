@@ -357,16 +357,25 @@ footer{padding:56px 0 20px; color:var(--ink-soft); font-size:14px}
 </head>
 <body>
 
-<header id="topbar" aria-hidden="true">
-  <div class="brand">Downhill<span>.</span></div>
-  <svg id="descent" viewBox="0 0 300 44" preserveAspectRatio="none">
-    <path class="dcurve" id="dcurve" d=""></path>
-    <path class="dtrail" id="dtrail" d=""></path>
-    <circle class="dmin" cx="292" cy="38" r="3"></circle>
-    <circle class="dball" id="dball" cx="8" cy="6" r="5"></circle>
-  </svg>
-  <div class="lossbadge">loss ≈ <b id="lossnow">27.67</b></div>
-</header>
+<!-- ===== standardized Groundwork article header (shared across all articles) ===== -->
+<style>
+#gwhead{position:fixed; top:0; left:0; right:0; z-index:70; background:rgba(243,246,244,.9); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); border-bottom:1px solid #D9E2DC}
+#gwhead .inner{max-width:1080px; margin:0 auto; display:flex; align-items:center; gap:16px; padding:9px 20px}
+#gwhead .backBtn{display:inline-flex; align-items:center; gap:5px; font-family:"Bricolage Grotesque",system-ui,sans-serif; font-weight:700; font-size:13px; text-decoration:none; color:#41565E; border:1.5px solid #D9E2DC; border-radius:999px; padding:5px 13px; white-space:nowrap; background:transparent; cursor:pointer; transition:border-color .15s, color .15s}
+#gwhead .backBtn:hover{border-color:#16262C; color:#16262C}
+#gwhead .brand{font-family:"Bricolage Grotesque",system-ui,sans-serif; font-weight:800; font-size:15px; color:#16262C; white-space:nowrap}
+#gwhead .brand span{color:#0FA697; font-weight:700}
+#gwhead .readbar{flex:1; height:8px; min-width:40px; background:#E7EEE9; border:1px solid #D9E2DC; border-radius:999px; overflow:hidden}
+#gwhead .readbar > i{display:block; height:100%; width:0; background:linear-gradient(90deg,#6C4CE0,#0FA697); transition:width .1s linear}
+@media (max-width:560px){ #gwhead .brand span{display:none} }
+@media (max-width:420px){ #gwhead .backBtn .back-label{display:none} }
+</style>
+<header id="gwhead"><div class="inner">
+  <a class="backBtn" href="../index.html" aria-label="Back to all articles">← <span class="back-label">Back</span></a>
+  <div class="brand">Groundwork <span>/ Machine Learning from First Principles</span></div>
+  <div class="readbar" aria-hidden="true"><i id="readprogFill"></i></div>
+</div></header>
+<script>(function(){var f=document.getElementById('readprogFill');if(!f)return;function u(){var d=document.documentElement;var m=(d.scrollHeight-d.clientHeight)||1;var p=Math.max(0,Math.min(1,(d.scrollTop||window.pageYOffset||0)/m));f.style.width=(p*100).toFixed(1)+'%';}window.addEventListener('scroll',u,{passive:true});window.addEventListener('resize',u);u();})();</script>
 
 <nav id="rail" aria-label="Chapter sections">
   <a href="#s1" data-sec="s1"><i>01</i>What ML is<span class="dot"></span></a>
@@ -426,7 +435,7 @@ footer{padding:56px 0 20px; color:var(--ink-soft); font-size:14px}
 <section class="hero" id="top">
   <span class="eyebrow">An interactive chapter · Machine Learning from first principles</span>
   <h1>A machine learns the way you find the bottom of a hill: <em>one small step downhill</em> at a time.</h1>
-  <p class="lede">No math background needed. Using one tiny example — predicting a house's price from its size — you'll watch a straight line teach itself to fit data. Every equation is explained in plain words, and everything that can move, moves. Watch the loss counter in the top bar: it falls to zero as you make your way down the page.</p>
+  <p class="lede">No math background needed. Using one tiny example — predicting a house's price from its size — you'll watch a straight line teach itself to fit data. Every equation is explained in plain words, and everything that can move, moves. Each section drops the error a little lower, until the line settles right through the data.</p>
   <a class="cta" href="#s1">Start walking ↓</a>
 </section>
 
