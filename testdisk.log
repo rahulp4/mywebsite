@@ -1,0 +1,66 @@
+
+
+Thu Jul  9 22:42:08 2026
+Command line: TestDisk
+
+TestDisk 7.2, Data Recovery Utility, February 2024
+Christophe GRENIER <grenier@cgsecurity.org>
+https://www.cgsecurity.org
+OS: Darwin, kernel 25.3.0 (Darwin Kernel Version 25.3.0: Wed Jan 28 20:53:31 PST 2026; root:xnu-12377.91.3~2/RELEASE_ARM64_T8103) arm64
+Compiler: GCC 4.2
+ext2fs lib: none, ntfs lib: none, reiserfs lib: none, ewf lib: none, curses lib: ncurses 6.0
+Hard disk list
+Disk /dev/disk5 - 1000 GB / 931 GiB - 1953458176 sectors, sector size=512
+Disk /dev/rdisk1 - 524 MB / 500 MiB - 128000 sectors (RO), sector size=4096
+Disk /dev/rdisk5 - 1000 GB / 931 GiB - 1953458176 sectors, sector size=512
+
+Partition table type (auto): Intel
+Disk /dev/disk5 - 1000 GB / 931 GiB
+Partition table type: Intel
+
+Analyse Disk /dev/disk5 - 1000 GB / 931 GiB - 1953458176 sectors
+Geometry from i386 MBR: head=255 sector=63
+check_part_i386 failed for partition type AF
+get_geometry_from_list_part_aux head=1 nbr=2
+get_geometry_from_list_part_aux head=8 nbr=2
+get_geometry_from_list_part_aux head=16 nbr=2
+get_geometry_from_list_part_aux head=32 nbr=2
+get_geometry_from_list_part_aux head=64 nbr=2
+get_geometry_from_list_part_aux head=128 nbr=2
+Current partition structure:
+No HFS or HFS+ structure
+ 1 * HFS                         2048 1953458175 1953456128
+ 1 * HFS                         2048 1953458175 1953456128
+
+Warning: Bad starting sector (CHS and LBA don't match)
+
+search_part()
+Disk /dev/disk5 - 1000 GB / 931 GiB - 1953458176 sectors
+BAD_RS LBA=4247466556 729
+check_part_i386 failed for partition type 07
+     HPFS - NTFS           4247466556 7322803106 3075336551
+This partition ends after the disk limits. (start=4247466556, size=3075336551, end=7322803106, disk end=1953458176)
+BAD_RS LBA=1573297301 995
+check_part_i386 failed for partition type 0E
+     FAT16 LBA             1573297301 3628652927 2055355627
+This partition ends after the disk limits. (start=1573297301, size=2055355627, end=3628652927, disk end=1953458176)
+Search for partition aborted
+Disk /dev/disk5 - 1000 GB / 931 GiB - 1953458176 sectors
+Check the hard disk size: HD jumper settings, BIOS detection...
+The hard disk (1000 GB / 931 GiB) seems too small! (< 3749 GB / 3491 GiB)
+The following partitions can't be recovered:
+     FAT16 LBA             1573297301 3628652927 2055355627
+     HPFS - NTFS           4247466556 7322803106 3075336551
+
+Results
+
+interface_write()
+ 
+No partition found or selected for recovery
+simulate write!
+
+write_mbr_i386: starting...
+write_all_log_i386: starting...
+No extended partition
+
+TestDisk exited normally.
