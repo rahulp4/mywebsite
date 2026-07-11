@@ -12,7 +12,6 @@
 <meta property="og:url" content="https://cloudsnativeai.cloud/articles/talent-search-and-scoring.html">
 <meta name="twitter:card" content="summary_large_image">
 <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <style>
 :root{
   --paper:#F3F6F4; --ink:#16262C; --ink-soft:#41565E; --card:#FFFFFF;
@@ -289,23 +288,65 @@ footer a{color:var(--match)}
       </div>
     </div>
 
-    <p>The call also returns a <code>_usage</code> block — how many tokens the parse burned and what it cost — so callers can watch their own spend. The cost is computed at parse time from the going per-million-token rates:</p>
-    <div class="panel mathp">
-      <div class="eq" data-tex="\text{cost}_{\$} = \dfrac{p \cdot r_{\text{in}} + c \cdot r_{\text{out}}}{1{,}000{,}000}">cost = (p·r_in + c·r_out) / 1,000,000</div>
-      <div class="controls" style="margin-top:6px; justify-content:center">
+    <p>The endpoint is small enough to read. Here is the actual method that runs on every upload — the four steps, in order:</p>
+    <div class="codelabel">app/parsewithllm/service.py — parse_resume_bytes</div>
+    <pre class="code"><span class="kw">def</span> <span class="nm">parse_resume_bytes</span>(file_bytes, filename):
+    <span class="cm"># 1. Only .pdf / .docx are accepted</span>
+    <span class="kw">if not</span> filename.lower().endswith((<span class="st">'.docx'</span>, <span class="st">'.pdf'</span>)):
+        <span class="kw">raise</span> UnsupportedResumeFormatError(...)
+
+    <span class="cm"># 2. Pull raw text out of the document</span>
+    document_processor = DocumentProcessor(io.BytesIO(file_bytes))
+    raw_resume_text    = document_processor.get_combined_document_content()
+
+    <span class="cm"># 3. Hand the text to Gemini, get structured JSON back</span>
+    resume_parser = ResumeParserService(api_key=api_key)
+    llm_parsed_data, raw_usage = resume_parser.parse_resume_with_gemini(raw_resume_text)
+
+    <span class="cm"># 4. Add deterministic derived metrics (never guessed by the LLM)</span>
+    analyzer = DataAnalyzerService()
+    llm_parsed_data[<span class="st">"organization_switches"</span>]   = analyzer.calculate_organization_switches(...)
+    llm_parsed_data[<span class="st">"total_experience_years"</span>]  = analyzer.calculate_total_experience(...)
+    llm_parsed_data[<span class="st">"current_tenure_years"</span>], ... = analyzer.calculate_current_job_tenure(...)
+
+    <span class="kw">return</span> llm_parsed_data, usage</pre>
+
+    <p>Step 2 doesn't trust the file extension — it sniffs the first four bytes to tell a PDF from a Word file, then dispatches to the right library:</p>
+    <div class="codelabel">app/parsewithllm/services/document_processor.py</div>
+    <pre class="code">_DOCX_MAGIC = <span class="st">b"PK\x03\x04"</span>   <span class="cm"># DOCX is a zip archive</span>
+_PDF_MAGIC  = <span class="st">b"%PDF"</span>          <span class="cm"># PDF header</span>
+
+head = content_stream.read(4)
+<span class="kw">if</span>   head.startswith(_DOCX_MAGIC):
+    self._document   = Document(content_stream)     <span class="cm"># python-docx</span>
+<span class="kw">elif</span> head.startswith(_PDF_MAGIC):
+    self._pdf_reader = PdfReader(content_stream)    <span class="cm"># PyPDF2</span></pre>
+
+    <p>Step 3 is where the language model earns its place: the extracted text is wrapped in a prompt carrying a strict JSON schema, sent to Gemini, and the reply is cleaned and parsed into a dict:</p>
+    <div class="codelabel">app/parsewithllm/services/resume_parser_service.py</div>
+    <pre class="code">self.gemini_model = genai.GenerativeModel(<span class="st">'models/gemini-2.5-flash'</span>)
+response    = self.gemini_model.generate_content(prompt)   <span class="cm"># prompt = schema + résumé text</span>
+json_string = response.text.strip()
+<span class="cm"># strip json code-fences + stray control chars, then:</span>
+parsed_data_dict = json.loads(json_string)</pre>
+
+    <p>Finally, the <code>_usage</code> block reports what the parse cost — snapshotted at call time from the configured per-million-token rates, so an old parse is never re-priced when rates change:</p>
+    <div class="codelabel">app/parsewithllm/service.py — _compute_cost_usd</div>
+    <pre class="code"><span class="kw">def</span> <span class="nm">_compute_cost_usd</span>(prompt_tokens, completion_tokens):
+    <span class="kw">return</span> (prompt_tokens     * settings.GEMINI_INPUT_USD_PER_MTOK
+          + completion_tokens * settings.GEMINI_OUTPUT_USD_PER_MTOK) / 1_000_000.0</pre>
+
+    <div class="panel demo">
+      <span class="tag">▶ Token cost of one parse</span>
+      <div class="controls" style="margin-top:6px">
         <div class="knob"><label>prompt tokens <span class="val" id="tokPv">4,800</span></label><input type="range" id="tokP" min="500" max="20000" value="4800" step="100"></div>
         <div class="knob"><label>completion tokens <span class="val" id="tokCv">1,600</span></label><input type="range" id="tokC" min="200" max="8000" value="1600" step="100"></div>
       </div>
-      <div class="readout" style="justify-content:center">
+      <div class="readout">
         <span class="big-metric par"><b id="tokTotal">6,400</b>total tokens</span>
         <span class="big-metric mat"><b id="tokCost">$0.0021</b>cost of this parse</span>
       </div>
-      <p class="note" style="text-align:center; margin-bottom:0">Illustrative rates: $0.30 / Mtok in, $2.50 / Mtok out. The real service reads these from config, so a single parse's cost is snapshotted and never re-priced later.</p>
-      <div class="glossary" style="justify-content:center">
-        <span class="chip"><b data-tex="p">p</b> prompt (input) tokens</span>
-        <span class="chip"><b data-tex="c">c</b> completion (output) tokens</span>
-        <span class="chip"><b data-tex="r">r</b> price per million tokens</span>
-      </div>
+      <p class="note" style="margin-bottom:0">Illustrative rates: $0.30 / Mtok in, $2.50 / Mtok out — plugged into the function above.</p>
     </div>
   </div>
 </section>
@@ -334,17 +375,18 @@ footer a{color:var(--match)}
       </div>
     </div>
 
-    <div class="panel mathp">
-      <span class="tag">∑ The formal bit</span>
-      <p style="margin-top:0">Total experience is the length of the <em>union</em> of the job intervals, in years; job switches count distinct employers, minus the one you're currently in:</p>
-      <div class="eq" data-tex="\text{years} = \dfrac{1}{365.25}\Big|\bigcup_i [s_i, e_i]\Big| \qquad \text{switches} = \max\!\big(0,\; |\text{companies}| - 1\big)">years = |⋃ intervals| / 365.25 · switches = max(0, |companies| − 1)</div>
-      <p>The same union trick powers "years with Kubernetes" and "skills used in the last 6 years" — every duration in the profile is a merged interval, never a naïve sum. Deterministic, auditable, and immune to the LLM's arithmetic.</p>
-      <div class="glossary">
-        <span class="chip"><b data-tex="[s_i,e_i]">[sᵢ,eᵢ]</b> one job's start → end</span>
-        <span class="chip"><b>∪</b> union — overlaps merged, counted once</span>
-        <span class="chip"><b>365.25</b> days/year (leap-adjusted)</span>
-      </div>
-    </div>
+    <p>In code, that's it exactly — build an interval per job, <span class="kw-match">merge the overlaps</span>, and measure the union. Switches just count distinct employers, minus the one you're currently in:</p>
+    <div class="codelabel">app/parsewithllm/services/data_analyzer_service.py</div>
+    <pre class="code"><span class="kw">def</span> <span class="nm">calculate_total_experience</span>(self, experience_entries):
+    intervals = [DateUtil.get_interval(e[<span class="st">'from'</span>], e[<span class="st">'to'</span>])
+                 <span class="kw">for</span> e <span class="kw">in</span> experience_entries <span class="kw">if</span> e.get(<span class="st">'from'</span>) <span class="kw">and</span> e.get(<span class="st">'to'</span>)]
+    merged = DateUtil.merge_intervals(intervals)      <span class="cm"># overlaps fused into one stretch</span>
+    <span class="kw">return</span> DateUtil.calculate_total_years(merged)     <span class="cm"># union length ÷ 365.25</span>
+
+<span class="kw">def</span> <span class="nm">calculate_organization_switches</span>(self, experience_entries):
+    companies = {e[<span class="st">'company'</span>].strip() <span class="kw">for</span> e <span class="kw">in</span> experience_entries <span class="kw">if</span> e.get(<span class="st">'company'</span>)}
+    <span class="kw">return</span> max(0, len(companies) - 1)</pre>
+    <p>The same <code>merge_intervals</code> trick powers "years with Kubernetes" and "skills used in the last 6 years" — every duration in the profile is a merged union, never a naïve sum. Deterministic, auditable, and immune to the LLM's arithmetic.</p>
   </div>
 </section>
 
@@ -394,18 +436,7 @@ footer a{color:var(--match)}
       <div id="matchBody"></div>
     </div>
 
-    <div class="panel mathp">
-      <span class="tag">∑ The formal bit</span>
-      <p style="margin-top:0"><b class="kw-data">Jaccard</b> — overlap of two sets of tags. <b class="kw-parse">Cosine</b> — the angle between two texts turned into vectors. <b class="kw-err">Operator</b> — a hard numeric gate, pass or fail.</p>
-      <div class="eq" data-tex="J(A,B)=\dfrac{|A\cap B|}{|A\cup B|} \qquad \cos(\mathbf{u},\mathbf{v})=\dfrac{\mathbf{u}\cdot\mathbf{v}}{\lVert\mathbf{u}\rVert\,\lVert\mathbf{v}\rVert} \qquad s=\mathbf{1}[\,x \bowtie t\,]">J = |A∩B|/|A∪B| · cos = u·v/(|u||v|) · s = 1[x ⋈ t]</div>
-      <p><b class="kw-match">Cross-encoder</b> has no tidy formula here — it's a small neural model that reads both strings together and rates their similarity, which is how it knows <em>Kubernetes ≈ GKE</em> and <em>Golang ≈ Go</em> even though they share no letters. That semantic reach is why skills use it instead of plain Jaccard.</p>
-      <div class="glossary">
-        <span class="chip"><b>A,B</b> two sets of tags</span>
-        <span class="chip"><b data-tex="\mathbf{u},\mathbf{v}">u,v</b> texts as number vectors</span>
-        <span class="chip"><b data-tex="\bowtie">⋈</b> a comparator: ≥, &gt;, &lt;</span>
-        <span class="chip"><b data-tex="\mathbf{1}[\cdot]">1[·]</b> 1 if true, else 0</span>
-      </div>
-    </div>
+    <p>Each method suits a different kind of field. <b class="kw-data">Jaccard</b> measures how much two tag sets overlap — perfect for lists, blind to meaning. <b class="kw-parse">Vector similarity</b> compares free text by meaning, so paraphrases still match. An <b class="kw-err">operator</b> is a hard numeric gate — pass or fail, no partial credit. And a <b class="kw-match">cross-encoder</b> is a small neural model that reads two strings together and rates how alike they mean, which is how it knows <em>Kubernetes ≈ GKE</em> and <em>Golang ≈ Go</em> even though they share no letters. That semantic reach is why skills and certifications use it instead of plain set-overlap.</p>
   </div>
 </section>
 
@@ -426,16 +457,29 @@ footer a{color:var(--match)}
       </div>
     </div>
 
-    <div class="panel mathp">
-      <span class="tag">∑ The formal bit</span>
-      <div class="eq" data-tex="\text{overall}_{\text{weighted}} = \dfrac{\sum_i s_i \, w_i}{\sum_i w_i}">overall = Σ(sᵢ·wᵢ) / Σ(wᵢ)</div>
-      <p>A hard gate makes this vivid: "years of experience" is an <span class="kw-err">operator</span> at weight 5. Miss the bar and its score is <b>0</b>, which drags <span class="eq-inline" data-tex="0 \times 5">0×5</span> through the sum and pulls the whole number down hard — exactly the behaviour you want for a non-negotiable.</p>
-      <p>And every row is <span class="kw-match">auditable</span>: the match service returns, per requirement, which candidate value it scored and the runners-up it considered — so "why 72%?" always has a paper trail.</p>
-      <div class="glossary">
-        <span class="chip"><b data-tex="s_i">sᵢ</b> requirement i's score (0–100)</span>
-        <span class="chip"><b data-tex="w_i">wᵢ</b> its weight (1–5)</span>
-      </div>
-    </div>
+    <p>None of this weighting lives in a formula on a slide — it's the match engine's job, and the backend's part is short: build the rubric, call the engine with the rubric plus the candidate profile, and take the weighted overall it returns.</p>
+    <div class="codelabel">app/background/scoring_pipeline.py — the matching engine, driven</div>
+    <pre class="code"><span class="cm"># 1. Merge the recruiter's inputs with registry defaults into the weighted rubric</span>
+req_json = build_match_spec(sparse_input, jd_id=jd_id, organization_id=org_id)
+
+<span class="cm"># 2. Call the match engine with the rubric + the parsed candidate profile</span>
+match_result = <span class="kw">await</span> MatchCompleteClient().match(profile, req_json)
+<span class="cm"># -> { "results": [{ field, score, best_source_used, sources_evaluated }],</span>
+<span class="cm">#      "overall_score_weighted":     float,</span>
+<span class="cm">#      "overall_score_average_all":  float }</span>
+
+<span class="cm"># 3. The weighted overall becomes the candidate's headline score</span>
+overall = <span class="kw">float</span>(match_result.get(<span class="st">"overall_score_weighted"</span>) <span class="kw">or</span> 0)
+requirement_scores = _normalise_requirement_scores(match_result.get(<span class="st">"results"</span>) <span class="kw">or</span> [])</pre>
+
+    <p>The engine call itself is just the contract — the rubric (<code>req_json</code>) and the profile (<code>data_json</code>) go in; scored results come back:</p>
+    <div class="codelabel">app/integrations/match_complete.py</div>
+    <pre class="code"><span class="kw">async def</span> <span class="nm">match</span>(self, data_json, req_json):
+    <span class="cm"># req_json  = the weighted rubric (the job)</span>
+    <span class="cm"># data_json = the parsed candidate profile</span>
+    <span class="kw">return await</span> self._post(<span class="st">""</span>, json={<span class="st">"req_json"</span>: req_json, <span class="st">"data_json"</span>: data_json})</pre>
+
+    <p>A hard gate makes the weighting vivid: "years of experience" is an <span class="kw-err">operator</span> at weight 5. Miss the bar and its score is <b>0</b> — a 0 on a weight-5 row drags the whole sum down hard, exactly the behaviour you want for a non-negotiable. And every row is <span class="kw-match">auditable</span>: the engine returns, per requirement, which candidate value it scored (<code>best_source_used</code>) and the runners-up it considered (<code>sources_evaluated</code>) — so "why 72%?" always has a paper trail.</p>
   </div>
 </section>
 
@@ -469,6 +513,11 @@ footer a{color:var(--match)}
     <p><span class="kw-err">Weight tuning is the product.</span> The matchers are just math; the judgement lives in the weights. Set them badly and a great candidate ranks below a keyword-stuffer.</p>
     <p><span class="kw-err">Wrong matcher, wrong answer.</span> Score skills with plain set-overlap and "GKE" won't match "Kubernetes". The semantic matcher exists precisely so equivalent tech isn't missed — using the wrong one silently drops good people.</p>
     <p>Match well, and the machine doesn't replace the recruiter — it hands them a ranked, reasoned shortlist and gives back the hours they'd have spent getting there.</p>
+
+    <div class="panel" style="border-color:var(--match); background:var(--match-soft)">
+      <span class="tag" style="background:#fff; color:var(--match)">A note on the code</span>
+      <p style="margin:0">The snippets above are lifted from the real service — trimmed for reading, but faithful to what runs. <b>Want more detail on the actual implementation</b> — the full prompt, the interval maths, the match-engine internals, or how a field maps to a matcher? <b>Post a question in the comments below</b> and I'll dig into it.</p>
+    </div>
   </div>
 </section>
 
@@ -527,7 +576,6 @@ footer a{color:var(--match)}
 
 <!-- ===== CDN libs ===== -->
 <script src="../assets/config.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" onload="window.__renderMath && window.__renderMath()"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer onload="window.__sbReady && window.__sbReady()"></script>
 
 <!-- ===== main script ===== -->
@@ -543,14 +591,6 @@ function col(n){ return (CSS.getPropertyValue(n)||'').trim()||'#000'; }
 var C={ ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:col('--hair-2'),
   parse:col('--parse'), parseSoft:col('--parse-soft'), match:col('--match'), matchSoft:col('--match-soft'),
   weight:col('--weight'), weightSoft:col('--weight-soft'), data:col('--data'), dataSoft:col('--data-soft'), err:col('--err') };
-
-function renderMath(){
-  if(!window.katex) return;
-  var ns=document.querySelectorAll('[data-tex]');
-  for(var i=0;i<ns.length;i++){ var n=ns[i]; if(n.getAttribute('data-done'))continue;
-    try{ window.katex.render(n.getAttribute('data-tex'), n, {displayMode:n.classList.contains('eq'), throwOnError:false}); n.setAttribute('data-done','1'); }catch(e){} }
-}
-window.__renderMath=renderMath; if(window.katex) renderMath();
 
 function setupCanvas(canvas){
   function resize(){
