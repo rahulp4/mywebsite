@@ -1,0 +1,949 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>How a résumé becomes a score — search & scoring, from first principles — Groundwork</title>
+<meta name="description" content="Inside a real résumé-matching API: how a PDF becomes structured data, how a job description turns into a weighted rubric, the three ways a candidate is compared (set overlap, meaning, and hard gates), and how it all collapses into one explainable score.">
+<link rel="canonical" href="https://cloudsnativeai.cloud/articles/talent-search-and-scoring.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="How a résumé becomes a score — search & scoring, from first principles">
+<meta property="og:description" content="Parse, then match. How a résumé-matching API turns a PDF into data and a job description into a weighted, explainable score — with live demos.">
+<meta property="og:url" content="https://cloudsnativeai.cloud/articles/talent-search-and-scoring.html">
+<meta name="twitter:card" content="summary_large_image">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<style>
+:root{
+  --paper:#F3F6F4; --ink:#16262C; --ink-soft:#41565E; --card:#FFFFFF;
+  --hair:#D9E2DC; --hair-2:#E7EEE9;
+  --r:14px; --shadow:0 1px 2px rgba(22,38,44,.05), 0 8px 24px rgba(22,38,44,.06);
+  --disp:"Bricolage Grotesque", system-ui, sans-serif;
+  --body:"Instrument Sans", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, monospace;
+
+  /* Semantic accents — one meaning each, all the way through */
+  --parse:#7A5AF0; --parse-soft:#EAE4FD;   /* extraction / the LLM reading the résumé */
+  --match:#12A594; --match-soft:#D2F1EC;    /* comparison / scoring (primary) */
+  --weight:#E08600; --weight-soft:#FBE8CC;  /* importance / weighting */
+  --data:#2D74C4; --data-soft:#DCEAF8;      /* candidate data / the profile */
+  --err:#D5484D; --err-soft:#F7E2E2;        /* mismatch / hard gate fail */
+  --truth:#1E9E6A;
+
+  /* aliases so the shared modules (which reference --model/--model-soft) work unmodified */
+  --model:var(--match); --model-soft:var(--match-soft);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--body); font-size:17px; line-height:1.62; -webkit-font-smoothing:antialiased}
+
+.wrap{max-width:820px; margin:0 auto; padding:0 22px}
+main{padding-bottom:60px}
+
+/* rail */
+#rail{position:fixed; top:50%; left:22px; transform:translateY(-50%); z-index:60; display:flex; flex-direction:column; gap:6px}
+#rail a{display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; color:var(--ink-soft); text-decoration:none; padding:3px 8px; border-radius:8px; max-width:34px; overflow:hidden; white-space:nowrap; transition:max-width .2s, background .2s, color .2s}
+#rail a .num{flex:none; width:18px; text-align:right; opacity:.65}
+#rail a .lbl{opacity:0; transition:opacity .2s}
+#rail a:hover,#rail a.active{max-width:250px; background:var(--card); color:var(--ink); box-shadow:var(--shadow)}
+#rail a:hover .lbl,#rail a.active .lbl{opacity:1}
+#rail a.active .num{color:var(--match); opacity:1}
+@media (max-width:1200px){ #rail{display:none} }
+
+/* hero */
+.hero{padding:104px 0 44px}
+.hero .eyebrow{color:var(--match)}
+.hero h1{font-family:var(--disp); font-weight:800; font-size:clamp(33px,6vw,56px); line-height:1.04; letter-spacing:-.02em; margin:.28em 0 .32em}
+.hero h1 .hl{color:var(--match)}
+.hero .lede{font-size:clamp(18px,2.4vw,21px); color:var(--ink-soft); max-width:62ch}
+.hero .meta{margin-top:24px; font-family:var(--mono); font-size:12.5px; color:var(--ink-soft); display:flex; gap:18px; flex-wrap:wrap}
+.cta{display:inline-flex; align-items:center; gap:9px; margin-top:28px; cursor:pointer; background:var(--ink); color:#fff; border:none; border-radius:999px; padding:13px 22px; font-family:var(--body); font-weight:600; font-size:15px; box-shadow:var(--shadow); text-decoration:none}
+.cta:hover{background:#0d1a1f}
+
+/* sections */
+.eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); font-weight:500}
+section.chapter{padding:44px 0; border-top:1px solid var(--hair)}
+section.chapter h2{font-family:var(--disp); font-weight:800; font-size:clamp(25px,4vw,34px); letter-spacing:-.015em; line-height:1.1; margin:.35em 0 .5em}
+section.chapter h3{font-family:var(--disp); font-weight:700; font-size:20px; margin:1.6em 0 .4em}
+section.chapter p{margin:.85em 0}
+.kw-parse{color:var(--parse); font-weight:600}
+.kw-match{color:var(--match); font-weight:600}
+.kw-weight{color:var(--weight); font-weight:600}
+.kw-data{color:var(--data); font-weight:600}
+.kw-err{color:var(--err); font-weight:600}
+
+/* panels */
+.panel{background:var(--card); border:1px solid var(--hair); border-radius:var(--r); padding:20px; margin:22px 0; box-shadow:var(--shadow)}
+.panel .tag{display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); background:var(--hair-2); padding:3px 9px; border-radius:999px; margin-bottom:12px}
+.panel.analogy{background:linear-gradient(180deg,var(--parse-soft),var(--card)); border-color:#E3DBFB}
+.panel.analogy .tag{background:#fff; color:var(--parse)}
+.panel.mathp{background:#FBFDFC}
+
+/* equations */
+.eq{margin:14px 0; text-align:center; overflow-x:auto; font-size:18px}
+.eq-inline{white-space:nowrap}
+.glossary{display:flex; flex-wrap:wrap; gap:8px; margin-top:12px}
+.chip{display:inline-flex; align-items:baseline; gap:6px; font-family:var(--mono); font-size:12px; background:var(--hair-2); border-radius:8px; padding:5px 10px; color:var(--ink-soft)}
+.chip b{color:var(--ink); font-weight:600}
+
+/* controls */
+.controls{display:flex; flex-wrap:wrap; gap:16px 22px; align-items:flex-end; margin:6px 0 4px}
+.knob{display:flex; flex-direction:column; gap:5px; font-size:13px; min-width:150px}
+.knob label{font-family:var(--mono); font-size:11.5px; color:var(--ink-soft)}
+.knob input[type=range]{width:100%; accent-color:var(--match)}
+.knob .val{font-family:var(--mono); color:var(--ink); font-weight:600}
+.seg{display:inline-flex; gap:4px; background:var(--hair-2); padding:4px; border-radius:10px; flex-wrap:wrap}
+.seg button{border:none; background:transparent; font-family:var(--body); font-size:13px; padding:6px 12px; border-radius:7px; cursor:pointer; color:var(--ink-soft)}
+.seg button.on{background:var(--card); color:var(--ink); box-shadow:var(--shadow); font-weight:600}
+.btnrow{display:flex; flex-wrap:wrap; gap:9px; margin-top:14px}
+.btn{border:1.5px solid var(--hair); background:var(--card); color:var(--ink); font-family:var(--body); font-weight:600; font-size:14px; padding:9px 16px; border-radius:10px; cursor:pointer; transition:border-color .15s, background .15s}
+.btn:hover{border-color:var(--match)}
+.btn.ghost{color:var(--ink-soft)}
+.btn.orange{background:var(--match); border-color:var(--match); color:#fff}
+.btn.orange:hover{background:#0c8b7e; border-color:#0c8b7e}
+.tinput{font-family:var(--mono); font-size:13px; width:100%; padding:9px 12px; border:1.5px solid var(--hair); border-radius:10px; background:#FCFDFC; color:var(--ink)}
+.tinput:focus{outline:none; border-color:var(--match)}
+
+/* canvas + readouts */
+canvas.plot{width:100%; display:block; border-radius:10px; background:#FCFDFC; border:1px solid var(--hair-2); touch-action:none}
+.readout{display:flex; flex-wrap:wrap; gap:10px 26px; margin-top:14px; font-family:var(--mono); font-size:12.5px; color:var(--ink-soft)}
+.readout .big-metric{display:flex; flex-direction:column; gap:1px}
+.readout .big-metric b{font-family:var(--disp); font-size:22px; color:var(--ink); line-height:1}
+.readout .big-metric.par b{color:var(--parse)} .readout .big-metric.mat b{color:var(--match)}
+.readout .big-metric.wei b{color:var(--weight)} .readout .big-metric.dat b{color:var(--data)}
+.readout .big-metric.err b{color:var(--err)}
+
+/* code */
+pre.code{background:#0f1c21; color:#dbe7e4; border-radius:12px; padding:16px 18px; overflow-x:auto; font-family:var(--mono); font-size:12.6px; line-height:1.6; margin:14px 0}
+pre.code .cm{color:#7fa39b} pre.code .kw{color:#7fd6c6} pre.code .st{color:#e0b184} pre.code .nm{color:#c8b6f5}
+.codelabel{font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); margin:16px 0 -6px}
+.note{font-size:13.5px; color:var(--ink-soft)}
+
+/* rubric / scorecard tables */
+.rows{display:flex; flex-direction:column; gap:8px; margin-top:6px}
+.row{display:grid; grid-template-columns: 1.5fr 78px 1fr 60px; gap:10px; align-items:center; padding:8px 10px; border:1px solid var(--hair-2); border-radius:10px; background:#FCFDFC}
+.row .rname{font-size:13.5px; font-weight:600}
+.row .rmethod{font-family:var(--mono); font-size:10.5px; color:#fff; padding:2px 7px; border-radius:999px; justify-self:start}
+.m-jaccard{background:var(--data)} .m-vector{background:var(--parse)} .m-operator{background:var(--err)} .m-cross{background:var(--match)}
+.row input[type=range]{width:100%; accent-color:var(--weight)}
+.row .rscore{font-family:var(--mono); font-weight:600; text-align:right}
+.wbar{height:8px; border-radius:999px; background:var(--hair-2); overflow:hidden}
+.wbar > i{display:block; height:100%; background:var(--weight)}
+@media (max-width:640px){ .row{grid-template-columns: 1fr 60px; } .row .rmethod,.row .wcell{display:none} }
+
+.reveal{opacity:0; transform:translateY(14px); transition:opacity .6s ease, transform .6s ease}
+.reveal.in{opacity:1; transform:none}
+@media (prefers-reduced-motion:reduce){ .reveal{opacity:1; transform:none; transition:none} }
+
+footer{border-top:1px solid var(--hair); padding:34px 0 70px; color:var(--ink-soft); font-size:14px}
+footer a{color:var(--match)}
+
+/* ===== shared module CSS (engagement / ai-tools / narrator) ===== */
+.likebtn{display:inline-flex; align-items:center; gap:8px; border:1.5px solid var(--hair); background:var(--card); border-radius:999px; padding:7px 16px; font-family:var(--body); font-size:13.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; margin:2px 0 20px; transition:border-color .15s, color .15s, background .15s}
+.likebtn:hover{border-color:var(--model)}
+.likebtn.liked{border-color:var(--model); color:var(--model); background:var(--model-soft); cursor:default}
+.likebtn .hrt{font-size:15px}
+.ctextarea{width:100%; font-family:var(--body); font-size:14.5px; padding:11px 14px; border-radius:10px; border:1.5px solid var(--hair); resize:vertical; background:#FCFDFC}
+.ctextarea:focus{outline:none; border-color:var(--model)}
+.clist{display:flex; flex-direction:column; gap:12px; margin-top:18px}
+.ccard{border:1px solid var(--hair-2); border-radius:10px; padding:12px 15px; background:#FCFDFC}
+.ccard .cname{font-weight:600; font-size:13.5px}
+.ccard .cbody{font-size:14px; margin-top:4px; white-space:pre-wrap; color:var(--ink)}
+.modalbg{position:fixed; inset:0; background:rgba(22,38,44,.45); z-index:90; display:flex; align-items:center; justify-content:center; padding:20px}
+.modalbg[hidden]{display:none}
+.modalbox{background:var(--card); border-radius:var(--r); padding:26px; width:min(370px,100%); box-shadow:var(--shadow)}
+.modalbox h4{margin:0 0 6px; font-family:var(--disp); font-weight:700; font-size:17px}
+.modalbox input{width:100%; font-family:var(--body); font-size:14.5px; padding:10px 13px; border-radius:9px; border:1.5px solid var(--hair); margin-top:10px; background:#FCFDFC}
+.modalbox input:focus{outline:none; border-color:var(--model)}
+#aitools{position:fixed; left:20px; bottom:20px; z-index:70; display:flex; flex-direction:column; align-items:flex-start; gap:10px}
+.ai-fab{display:inline-flex; align-items:center; gap:8px; border:none; cursor:pointer; border-radius:999px; background:var(--ink); color:#fff; font-family:var(--body); font-weight:600; font-size:13.5px; padding:12px 18px; box-shadow:var(--shadow); transition:background .15s}
+.ai-fab:hover{background:#0d1a1f}
+.ai-fab.done{background:var(--truth)}
+.askai{margin:14px 0 4px; padding:14px 16px; border:1px dashed var(--hair); border-radius:12px; background:var(--hair-2)}
+.askai .tag{color:var(--ink-soft); background:var(--card)}
+.askrow{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
+.askchip{display:inline-flex; align-items:center; gap:7px; max-width:100%; text-align:left; border:1.5px solid var(--hair); background:var(--card); border-radius:10px; padding:8px 12px; font-family:var(--body); font-size:13px; color:var(--ink); cursor:pointer; transition:border-color .15s}
+.askchip:hover{border-color:var(--model)}
+.askchip .ico{flex:none; font-size:13px}
+.askchip.done{border-color:var(--truth); color:var(--truth)}
+@media (max-width:920px){ #aitools{left:12px; bottom:12px} .ai-fab{padding:10px 14px; font-size:12.5px} }
+#narrator{position:fixed; right:20px; bottom:20px; z-index:70; display:flex; flex-direction:column; align-items:flex-end; gap:10px}
+.narr-fab{width:52px; height:52px; border-radius:50%; border:none; cursor:pointer; background:var(--ink); color:#fff; font-size:20px; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; transition:background .15s}
+.narr-fab:hover{background:#0d1a1f}
+.narr-fab.active{background:var(--model)}
+.narr-fab.speaking{animation:narrpulse 1.4s ease-in-out infinite}
+@keyframes narrpulse{0%,100%{box-shadow:0 0 0 0 rgba(18,165,148,.45)}50%{box-shadow:0 0 0 10px rgba(18,165,148,0)}}
+@media (prefers-reduced-motion:reduce){ .narr-fab.speaking{animation:none} }
+.narr-panel{width:270px; background:var(--card); border:1px solid var(--hair); border-radius:var(--r); box-shadow:var(--shadow); padding:16px; font-size:13.5px}
+.narr-panel h4{margin:0 0 10px; font-family:var(--disp); font-weight:700; font-size:14.5px}
+.narr-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px}
+.narr-row:last-of-type{margin-bottom:0}
+.narr-row select{flex:1; font-size:13px; padding:6px 8px; border-radius:8px}
+.narr-btnrow{display:flex; gap:8px; margin-top:2px}
+.btn.small{padding:6px 12px; font-size:12.5px}
+.narr-status{margin-top:10px; padding-top:10px; border-top:1px solid var(--hair-2); color:var(--ink-soft); font-family:var(--mono); font-size:11.5px; min-height:16px}
+.narr-status b{color:var(--model); font-weight:600}
+#rail a .dot{display:none; width:6px; height:6px; border-radius:50%; background:var(--model); margin-left:auto}
+#rail a.speaking .dot{display:inline-block; animation:narrpulse2 1.2s ease-in-out infinite}
+@keyframes narrpulse2{0%,100%{opacity:1}50%{opacity:.25}}
+</style>
+</head>
+<body>
+
+<!-- ===== standardized Groundwork article header (shared across all articles) ===== -->
+<style>
+#gwhead{position:fixed; top:0; left:0; right:0; z-index:70; background:rgba(243,246,244,.9); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); border-bottom:1px solid #D9E2DC}
+#gwhead .inner{max-width:1080px; margin:0 auto; display:flex; align-items:center; gap:16px; padding:9px 20px}
+#gwhead .backBtn{display:inline-flex; align-items:center; gap:5px; font-family:"Bricolage Grotesque",system-ui,sans-serif; font-weight:700; font-size:13px; text-decoration:none; color:#41565E; border:1.5px solid #D9E2DC; border-radius:999px; padding:5px 13px; white-space:nowrap; background:transparent; cursor:pointer; transition:border-color .15s, color .15s}
+#gwhead .backBtn:hover{border-color:#16262C; color:#16262C}
+#gwhead .brand{font-family:"Bricolage Grotesque",system-ui,sans-serif; font-weight:800; font-size:15px; color:#16262C; white-space:nowrap}
+#gwhead .brand span{color:#0FA697; font-weight:700}
+#gwhead .readbar{flex:1; height:8px; min-width:40px; background:#E7EEE9; border:1px solid #D9E2DC; border-radius:999px; overflow:hidden}
+#gwhead .readbar > i{display:block; height:100%; width:0; background:linear-gradient(90deg,#6C4CE0,#0FA697); transition:width .1s linear}
+@media (max-width:560px){ #gwhead .brand span{display:none} }
+@media (max-width:420px){ #gwhead .backBtn .back-label{display:none} }
+</style>
+<header id="gwhead"><div class="inner">
+  <a class="backBtn" href="../index.html" aria-label="Back to all articles">← <span class="back-label">Back</span></a>
+  <div class="brand">Groundwork <span>/ Résumé search &amp; scoring</span></div>
+  <div class="readbar" aria-hidden="true"><i id="readprogFill"></i></div>
+</div></header>
+<script>(function(){var f=document.getElementById('readprogFill');if(!f)return;function u(){var d=document.documentElement;var m=(d.scrollHeight-d.clientHeight)||1;var p=Math.max(0,Math.min(1,(d.scrollTop||window.pageYOffset||0)/m));f.style.width=(p*100).toFixed(1)+'%';}window.addEventListener('scroll',u,{passive:true});window.addEventListener('resize',u);u();})();</script>
+
+<nav id="rail">
+  <a href="#top" data-sec="top"><span class="num">00</span><span class="lbl">Intro</span><span class="dot"></span></a>
+  <a href="#s1" data-sec="s1"><span class="num">01</span><span class="lbl">Parse, then match</span><span class="dot"></span></a>
+  <a href="#s2" data-sec="s2"><span class="num">02</span><span class="lbl">Résumé → data</span><span class="dot"></span></a>
+  <a href="#s3" data-sec="s3"><span class="num">03</span><span class="lbl">Math on time</span><span class="dot"></span></a>
+  <a href="#s4" data-sec="s4"><span class="num">04</span><span class="lbl">The rubric</span><span class="dot"></span></a>
+  <a href="#s5" data-sec="s5"><span class="num">05</span><span class="lbl">Three matchers</span><span class="dot"></span></a>
+  <a href="#s6" data-sec="s6"><span class="num">06</span><span class="lbl">One score</span><span class="dot"></span></a>
+  <a href="#s7" data-sec="s7"><span class="num">07</span><span class="lbl">Recap &amp; pitfalls</span><span class="dot"></span></a>
+</nav>
+
+<main>
+<header class="hero wrap" id="top">
+  <span class="eyebrow">AI Projects · a real matching API, explained</span>
+  <h1>How a résumé becomes a <span class="hl">score</span>.</h1>
+  <p class="lede">A single opening can draw hundreds of résumés. Behind a "best match: 87%" badge sits a real pipeline: an AI <span class="kw-parse">reads</span> each PDF into structured data, a job description becomes a <span class="kw-weight">weighted checklist</span>, and every candidate is <span class="kw-match">compared and scored</span> against it — explainably. Let's build that pipeline from the ground up, with something to poke at each step.</p>
+  <a class="cta" href="#s1">Start with the pipeline ↓</a>
+  <div class="meta"><span>~20 min · interactive</span><span>based on a production <code>/parsewithllm</code> + match service</span></div>
+</header>
+
+<!-- ===== S1 ===== -->
+<section class="chapter reveal" id="s1">
+  <div class="wrap">
+    <span class="eyebrow">01 — The shape of the problem</span>
+    <h2>Two halves: parse, then match</h2>
+    <p>Every résumé arrives as a <span class="kw-parse">document</span> — a PDF or Word file built for human eyes, not for comparison. And every job is a wishlist in a recruiter's head. To rank one against the other, a machine has to do two very different jobs, in order.</p>
+    <p><b>First, parse.</b> Turn each messy résumé into the same tidy <span class="kw-data">structured profile</span> — name, experience, skills, dates — so two candidates can be compared field by field. <b>Then, match.</b> Turn the job description into a <span class="kw-weight">rubric</span> and score each profile against it. This article walks the whole path; the demo below is the map.</p>
+
+    <div class="panel demo">
+      <span class="tag">▶ Step through the pipeline</span>
+      <p class="note" style="margin-top:0">One résumé's journey from uploaded file to a saved score. Press <b>Next</b> to advance a stage.</p>
+      <canvas class="plot" id="pipeCanvas" height="200" aria-label="The parse-then-match pipeline, stage by stage"></canvas>
+      <div class="btnrow">
+        <button class="btn orange" id="pipeNext" type="button">Next stage →</button>
+        <button class="btn ghost" id="pipeReset" type="button">Restart</button>
+      </div>
+      <p class="note" id="pipeCaption" style="margin-top:12px"></p>
+    </div>
+    <p>Notice the split. The <span class="kw-parse">parse</span> half is one <code>POST /api/v1/parsewithllm</code> call. The <span class="kw-match">match</span> half is a second service that takes two JSON blobs — the job's rubric and the candidate's profile — and returns a score. The rest of the article is those two halves, up close.</p>
+  </div>
+</section>
+
+<!-- ===== S2 ===== -->
+<section class="chapter reveal" id="s2">
+  <div class="wrap">
+    <span class="eyebrow">02 — The parse endpoint</span>
+    <h2>Turning a résumé into data</h2>
+    <p>The parsing endpoint is deliberately tiny on the outside: you <code>POST</code> a <code>.pdf</code> or <code>.docx</code> file, and it returns structured JSON. Inside, it runs four steps — and the interesting one is that a <span class="kw-parse">large language model</span> does the actual reading.</p>
+
+    <div class="panel">
+      <span class="tag">the four steps</span>
+      <ol style="margin:0; padding-left:20px">
+        <li><b>Validate</b> — reject anything that isn't a <code>.pdf</code> or <code>.docx</code>.</li>
+        <li><b class="kw-parse">Extract text</b> — pull the raw words out of the document.</li>
+        <li><b class="kw-parse">LLM parse</b> — hand that text to Gemini with a schema, and get back structured fields (experience, skills, education, dates).</li>
+        <li><b class="kw-data">Derive metrics</b> — compute things the LLM shouldn't guess at: total experience, tenure, job switches (that's the next section).</li>
+      </ol>
+    </div>
+
+    <div class="panel analogy">
+      <span class="tag">📇 An analogy</span>
+      <p style="margin-top:0">A résumé is a hand-written index card in someone's own style — abbreviations, gaps, a personal layout. The LLM is a patient assistant who reads any card and copies it onto one <em>standard form</em>. Once every candidate is on the same form, they line up in the same boxes and you can finally compare them.</p>
+    </div>
+
+    <p>Why a language model rather than rules? Because résumés don't follow rules. "Sr. SWE II", "Senior Software Engineer", and "Software Eng. (L5)" all mean the same job; dates appear as "2019–Present", "Jan 2019", or "03/19". A model reads intent; a regex reads only what you anticipated.</p>
+
+    <div class="panel demo">
+      <span class="tag">▶ From blob to fields</span>
+      <p class="note" style="margin-top:0">A snippet of raw résumé text on the left, the structured profile the model returns on the right. Toggle a messier input and watch the same fields still get filled.</p>
+      <div class="seg" id="parseStyle" style="margin-bottom:12px">
+        <button class="on" data-s="clean" type="button">Tidy résumé</button>
+        <button data-s="messy" type="button">Messy résumé</button>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px" id="parseGrid">
+        <div><div class="codelabel">raw text in</div><pre class="code" id="parseIn" style="min-height:150px"></pre></div>
+        <div><div class="codelabel">structured JSON out</div><pre class="code" id="parseOut" style="min-height:150px"></pre></div>
+      </div>
+    </div>
+
+    <p>The call also returns a <code>_usage</code> block — how many tokens the parse burned and what it cost — so callers can watch their own spend. The cost is computed at parse time from the going per-million-token rates:</p>
+    <div class="panel mathp">
+      <div class="eq" data-tex="\text{cost}_{\$} = \dfrac{p \cdot r_{\text{in}} + c \cdot r_{\text{out}}}{1{,}000{,}000}">cost = (p·r_in + c·r_out) / 1,000,000</div>
+      <div class="controls" style="margin-top:6px; justify-content:center">
+        <div class="knob"><label>prompt tokens <span class="val" id="tokPv">4,800</span></label><input type="range" id="tokP" min="500" max="20000" value="4800" step="100"></div>
+        <div class="knob"><label>completion tokens <span class="val" id="tokCv">1,600</span></label><input type="range" id="tokC" min="200" max="8000" value="1600" step="100"></div>
+      </div>
+      <div class="readout" style="justify-content:center">
+        <span class="big-metric par"><b id="tokTotal">6,400</b>total tokens</span>
+        <span class="big-metric mat"><b id="tokCost">$0.0021</b>cost of this parse</span>
+      </div>
+      <p class="note" style="text-align:center; margin-bottom:0">Illustrative rates: $0.30 / Mtok in, $2.50 / Mtok out. The real service reads these from config, so a single parse's cost is snapshotted and never re-priced later.</p>
+      <div class="glossary" style="justify-content:center">
+        <span class="chip"><b data-tex="p">p</b> prompt (input) tokens</span>
+        <span class="chip"><b data-tex="c">c</b> completion (output) tokens</span>
+        <span class="chip"><b data-tex="r">r</b> price per million tokens</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S3 ===== -->
+<section class="chapter reveal" id="s3">
+  <div class="wrap">
+    <span class="eyebrow">03 — Derived signals</span>
+    <h2>Doing math on time</h2>
+    <p>Some facts you never trust an LLM to compute — you compute them yourself, deterministically, from the dates it extracted. "How many years of experience?" sounds trivial until you realise people hold <em>overlapping</em> jobs: a full-time role and a side contract, or two titles at one company. Add the durations naïvely and you'll credit someone with 15 years of experience in a 10-year career.</p>
+    <p>The fix is <span class="kw-match">interval merging</span>: lay every job on a timeline, fuse the overlaps into single continuous stretches, and measure the <em>union</em>. Drag the jobs below and watch the naïve sum diverge from the honest total.</p>
+
+    <div class="panel demo">
+      <span class="tag">▶ Overlapping jobs, one honest total</span>
+      <canvas class="plot" id="expCanvas" height="220" aria-label="Two job intervals on a timeline; total experience is their merged union"></canvas>
+      <div class="controls" style="margin-top:14px">
+        <div class="knob"><label>Job A — start <span class="val" id="aStartV">2015</span></label><input type="range" id="aStart" min="2010" max="2024" value="2015" step="1"></div>
+        <div class="knob"><label>Job A — end <span class="val" id="aEndV">2021</span></label><input type="range" id="aEnd" min="2011" max="2025" value="2021" step="1"></div>
+        <div class="knob"><label>Job B — start <span class="val" id="bStartV">2019</span></label><input type="range" id="bStart" min="2010" max="2024" value="2019" step="1"></div>
+        <div class="knob"><label>Job B — end <span class="val" id="bEndV">2025</span></label><input type="range" id="bEnd" min="2011" max="2025" value="2025" step="1"></div>
+      </div>
+      <div class="readout">
+        <span class="big-metric err"><b id="expSum">—</b>naïve sum (double-counts)</span>
+        <span class="big-metric mat"><b id="expUnion">—</b>merged union (the truth)</span>
+        <span class="big-metric dat"><b id="expSwitch">—</b>org switches</span>
+      </div>
+    </div>
+
+    <div class="panel mathp">
+      <span class="tag">∑ The formal bit</span>
+      <p style="margin-top:0">Total experience is the length of the <em>union</em> of the job intervals, in years; job switches count distinct employers, minus the one you're currently in:</p>
+      <div class="eq" data-tex="\text{years} = \dfrac{1}{365.25}\Big|\bigcup_i [s_i, e_i]\Big| \qquad \text{switches} = \max\!\big(0,\; |\text{companies}| - 1\big)">years = |⋃ intervals| / 365.25 · switches = max(0, |companies| − 1)</div>
+      <p>The same union trick powers "years with Kubernetes" and "skills used in the last 6 years" — every duration in the profile is a merged interval, never a naïve sum. Deterministic, auditable, and immune to the LLM's arithmetic.</p>
+      <div class="glossary">
+        <span class="chip"><b data-tex="[s_i,e_i]">[sᵢ,eᵢ]</b> one job's start → end</span>
+        <span class="chip"><b>∪</b> union — overlaps merged, counted once</span>
+        <span class="chip"><b>365.25</b> days/year (leap-adjusted)</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S4 ===== -->
+<section class="chapter reveal" id="s4">
+  <div class="wrap">
+    <span class="eyebrow">04 — The job description as data</span>
+    <h2>A rubric, not a paragraph</h2>
+    <p>Now the other half. A job description in prose can't be scored — "strong Java, cloud-native, 10+ years" is for humans. So the system turns it into a <span class="kw-weight">rubric</span>: a list of requirements, each one a small, explicit rule.</p>
+    <p>Every rule answers four questions:</p>
+    <div class="panel">
+      <div class="glossary" style="gap:10px">
+        <span class="chip"><b>data</b> — what to look for ("Java", "≥10")</span>
+        <span class="chip"><b class="kw-match">matchreq</b> — how to compare (next section)</span>
+        <span class="chip"><b class="kw-weight">weightage</b> — how much it matters (1–5)</span>
+        <span class="chip"><b class="kw-data">profiledatasource</b> — where to look in the profile</span>
+      </div>
+    </div>
+    <p>That last one is subtle and powerful. A single requirement can point at several places in the candidate's profile, and the matcher takes the <em>best</em> score across them. "Technical skills" looks in languages, frameworks, tools, platforms, <em>and</em> the technologies listed on each job — so a skill only mentioned inside a project description still counts.</p>
+
+    <div class="panel demo">
+      <span class="tag">▶ One requirement, as JSON</span>
+      <p class="note" style="margin-top:0">A real rule from the sample job description. Every requirement on the rubric has this exact shape.</p>
+      <pre class="code" id="ruleJson"></pre>
+      <p class="note" style="margin-bottom:0"><code>weightage: 5</code> is a must-have; <code>sourcecondition: "OR"</code> means matching <em>any</em> listed value (any acceptable location) is enough.</p>
+    </div>
+
+    <p>A recruiter never writes this JSON by hand — a wizard does. Each requirement is a known field with a sensible default weight and matcher; the recruiter fills in the values and nudges the weights. The result is a complete, machine-scorable rubric.</p>
+  </div>
+</section>
+
+<!-- ===== S5 ===== -->
+<section class="chapter reveal" id="s5">
+  <div class="wrap">
+    <span class="eyebrow">05 — The methodology</span>
+    <h2>Three ways to compare (and a fourth for meaning)</h2>
+    <p>Not every requirement is compared the same way — that's the core idea. A list of skills, a paragraph about the role, and a "10+ years" bar are different <em>kinds</em> of thing, and each needs its own kind of match. The rubric names the method per field with <code>matchreq</code>. Try each below.</p>
+
+    <div class="panel demo">
+      <span class="tag">▶ The matcher playground</span>
+      <div class="seg" id="matchTabs" style="margin-bottom:14px">
+        <button class="on" data-m="jaccard" type="button">Jaccard · lists</button>
+        <button data-m="vector" type="button">Vector · meaning</button>
+        <button data-m="operator" type="button">Operator · numbers</button>
+        <button data-m="cross" type="button">Cross-encoder · skills</button>
+      </div>
+      <div id="matchBody"></div>
+    </div>
+
+    <div class="panel mathp">
+      <span class="tag">∑ The formal bit</span>
+      <p style="margin-top:0"><b class="kw-data">Jaccard</b> — overlap of two sets of tags. <b class="kw-parse">Cosine</b> — the angle between two texts turned into vectors. <b class="kw-err">Operator</b> — a hard numeric gate, pass or fail.</p>
+      <div class="eq" data-tex="J(A,B)=\dfrac{|A\cap B|}{|A\cup B|} \qquad \cos(\mathbf{u},\mathbf{v})=\dfrac{\mathbf{u}\cdot\mathbf{v}}{\lVert\mathbf{u}\rVert\,\lVert\mathbf{v}\rVert} \qquad s=\mathbf{1}[\,x \bowtie t\,]">J = |A∩B|/|A∪B| · cos = u·v/(|u||v|) · s = 1[x ⋈ t]</div>
+      <p><b class="kw-match">Cross-encoder</b> has no tidy formula here — it's a small neural model that reads both strings together and rates their similarity, which is how it knows <em>Kubernetes ≈ GKE</em> and <em>Golang ≈ Go</em> even though they share no letters. That semantic reach is why skills use it instead of plain Jaccard.</p>
+      <div class="glossary">
+        <span class="chip"><b>A,B</b> two sets of tags</span>
+        <span class="chip"><b data-tex="\mathbf{u},\mathbf{v}">u,v</b> texts as number vectors</span>
+        <span class="chip"><b data-tex="\bowtie">⋈</b> a comparator: ≥, &gt;, &lt;</span>
+        <span class="chip"><b data-tex="\mathbf{1}[\cdot]">1[·]</b> 1 if true, else 0</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S6 ===== -->
+<section class="chapter reveal" id="s6">
+  <div class="wrap">
+    <span class="eyebrow">06 — From many scores to one</span>
+    <h2>Rolling it up into a single number</h2>
+    <p>Each requirement now yields a 0–100 score. The last step blends them into one headline number — but not a plain average, because a must-have and a nice-to-have shouldn't count the same. Each score is multiplied by its <span class="kw-weight">weight</span>, and the whole thing is normalised so it stays on a 0–100 scale.</p>
+
+    <div class="panel demo">
+      <span class="tag">▶ The score breakdown — tune it live</span>
+      <p class="note" style="margin-top:0">Real requirements from the sample job description. Drag each <span class="kw-weight">weight</span> and <span class="kw-match">score</span> and watch the weighted total move. Notice how a low score on a <em>heavy</em> row hurts far more than on a light one.</p>
+      <div class="rows" id="scoreRows"></div>
+      <div class="readout" style="margin-top:16px">
+        <span class="big-metric mat"><b id="ovWeighted">—</b>overall (weighted)</span>
+        <span class="big-metric dat"><b id="ovAverage">—</b>plain average, for contrast</span>
+      </div>
+    </div>
+
+    <div class="panel mathp">
+      <span class="tag">∑ The formal bit</span>
+      <div class="eq" data-tex="\text{overall}_{\text{weighted}} = \dfrac{\sum_i s_i \, w_i}{\sum_i w_i}">overall = Σ(sᵢ·wᵢ) / Σ(wᵢ)</div>
+      <p>A hard gate makes this vivid: "years of experience" is an <span class="kw-err">operator</span> at weight 5. Miss the bar and its score is <b>0</b>, which drags <span class="eq-inline" data-tex="0 \times 5">0×5</span> through the sum and pulls the whole number down hard — exactly the behaviour you want for a non-negotiable.</p>
+      <p>And every row is <span class="kw-match">auditable</span>: the match service returns, per requirement, which candidate value it scored and the runners-up it considered — so "why 72%?" always has a paper trail.</p>
+      <div class="glossary">
+        <span class="chip"><b data-tex="s_i">sᵢ</b> requirement i's score (0–100)</span>
+        <span class="chip"><b data-tex="w_i">wᵢ</b> its weight (1–5)</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S7 ===== -->
+<section class="chapter reveal" id="s7">
+  <div class="wrap">
+    <span class="eyebrow">07 — Wrap-up</span>
+    <h2>Recap, use cases &amp; pitfalls</h2>
+    <p>End to end: a résumé is <span class="kw-parse">parsed</span> into a standard profile, a job becomes a <span class="kw-weight">weighted rubric</span>, each requirement is <span class="kw-match">matched</span> with the right method, and the pieces roll up into one explainable score that ranks the pile.</p>
+
+    <h3>The ideas, in one place</h3>
+    <div class="panel">
+      <div class="glossary" style="gap:10px">
+        <span class="chip"><b>parse</b> PDF/DOCX → LLM → structured profile</span>
+        <span class="chip"><b>derive</b> durations via merged intervals</span>
+        <span class="chip"><b>rubric</b> data · matchreq · weight · source</span>
+        <span class="chip"><b>jaccard</b> set overlap for tags</span>
+        <span class="chip"><b>vector</b> cosine for meaning</span>
+        <span class="chip"><b>operator</b> hard numeric gate</span>
+        <span class="chip"><b>cross-encoder</b> semantic skill match</span>
+        <span class="chip"><b>roll-up</b> Σ s·w / Σ w</span>
+      </div>
+    </div>
+
+    <h3>Where it earns its keep</h3>
+    <p><b>Ranking the pile.</b> Hundreds of applicants become a sorted, filterable list — "show me everyone above 75%" — instead of a folder nobody opens. <b>Explainable screening.</b> Because each score carries its evidence, a recruiter (or an audit) can see <em>why</em>, not just <em>what</em>. <b>Consistent rubrics.</b> The same weighted criteria apply to every candidate, which is both faster and fairer than mood-of-the-afternoon screening.</p>
+
+    <h3>Pitfalls worth knowing</h3>
+    <p><span class="kw-err">Garbage in.</span> If the parse misreads a scanned PDF, every downstream score inherits the error — extraction quality is load-bearing.</p>
+    <p><span class="kw-err">Proxy signals.</span> Some fields are inferred, not stated — "work mode" is guessed from where past jobs were located, so it carries a deliberately low weight. Know which signals are real and which are stand-ins.</p>
+    <p><span class="kw-err">Weight tuning is the product.</span> The matchers are just math; the judgement lives in the weights. Set them badly and a great candidate ranks below a keyword-stuffer.</p>
+    <p><span class="kw-err">Wrong matcher, wrong answer.</span> Score skills with plain set-overlap and "GKE" won't match "Kubernetes". The semantic matcher exists precisely so equivalent tech isn't missed — using the wrong one silently drops good people.</p>
+    <p>Match well, and the machine doesn't replace the recruiter — it hands them a ranked, reasoned shortlist and gives back the hours they'd have spent getting there.</p>
+  </div>
+</section>
+
+<!-- ===== engagement: comments (id must NOT start with 's') ===== -->
+<div id="emailModalBg" class="modalbg" hidden>
+  <div class="modalbox">
+    <h4>One quick thing</h4>
+    <p class="note">Add your name and email so we know who's liking and commenting. We won't spam you, and this browser won't ask again.</p>
+    <input type="text" id="mName" placeholder="Name">
+    <input type="email" id="mEmail" placeholder="you@example.com">
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn orange" id="mContinue">Continue</button>
+      <button class="btn ghost" id="mCancel">Cancel</button>
+    </div>
+    <div class="note" id="mErr" style="color:var(--err); margin-top:8px"></div>
+  </div>
+</div>
+
+<section id="comments" class="chapter reveal">
+  <div class="wrap">
+    <span class="eyebrow">Join the discussion</span>
+    <h2>Comments</h2>
+    <p class="note" id="commentsConfigNote" hidden>Comments and likes aren't connected to a backend yet — search this file for "SUPABASE_URL" for setup steps. They'll still work on this screen, but won't be saved or shown to other visitors until that's done.</p>
+    <div class="panel demo">
+      <span class="tag">Leave a comment on the article</span>
+      <textarea id="cBody" class="ctextarea" rows="3" placeholder="Ask a question, share what clicked for you…"></textarea>
+      <div class="btnrow"><button class="btn orange" id="cSubmit">Post comment</button></div>
+      <div class="note" id="cStatus" style="margin-top:6px"></div>
+      <div class="clist" id="cList"></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p><b>How a résumé becomes a score.</b> A from-first-principles Groundwork write-up on the search &amp; scoring behind a real résumé-matching API — the <code>/parsewithllm</code> parse endpoint and the weighted match service it feeds.</p>
+    <p class="note">Interactive demos are illustrative — token costs, similarity scores, and timelines are for building intuition, not benchmarks.</p>
+  </div>
+</footer>
+</main>
+
+<!-- ===== floating widgets ===== -->
+<div id="narrator">
+  <div class="narr-panel" id="narrPanel" hidden>
+    <h4>Voice narration</h4>
+    <div class="narr-row"><span>Narrate as I scroll</span><button id="narrOnOff" class="btn ghost small">Turn on</button></div>
+    <div class="narr-row"><select id="narrVoice" aria-label="Choose a voice"></select></div>
+    <div class="narr-btnrow"><button id="narrReplay" class="btn ghost small">Replay section</button><button id="narrPauseBtn" class="btn ghost small" disabled>Pause</button></div>
+    <div class="narr-status" id="narrStatus">Off — press "Turn on" to begin.</div>
+  </div>
+  <button id="narrFab" class="narr-fab" aria-label="Open voice narration controls" aria-expanded="false" title="Voice narration">🔊</button>
+</div>
+<div id="aitools">
+  <button id="aiCopyFab" class="ai-fab" type="button">📋 Copy this article for your AI</button>
+</div>
+
+<!-- ===== CDN libs ===== -->
+<script src="../assets/config.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js" onload="window.__renderMath && window.__renderMath()"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer onload="window.__sbReady && window.__sbReady()"></script>
+
+<!-- ===== main script ===== -->
+<script>
+var CONFIG = Object.assign({}, window.CONFIG_SHARED || {SUPABASE_URL:'YOUR_SUPABASE_URL', SUPABASE_ANON_KEY:'YOUR_SUPABASE_ANON_KEY'}, {
+  ARTICLE_ID: 'talent-search-scoring'
+});
+function el(id){ return document.getElementById(id); }
+function on(id,ev,fn){ var e=el(id); if(e) e.addEventListener(ev,fn); }
+
+var CSS=getComputedStyle(document.documentElement);
+function col(n){ return (CSS.getPropertyValue(n)||'').trim()||'#000'; }
+var C={ ink:col('--ink'), soft:col('--ink-soft'), hair:col('--hair'), hair2:col('--hair-2'),
+  parse:col('--parse'), parseSoft:col('--parse-soft'), match:col('--match'), matchSoft:col('--match-soft'),
+  weight:col('--weight'), weightSoft:col('--weight-soft'), data:col('--data'), dataSoft:col('--data-soft'), err:col('--err') };
+
+function renderMath(){
+  if(!window.katex) return;
+  var ns=document.querySelectorAll('[data-tex]');
+  for(var i=0;i<ns.length;i++){ var n=ns[i]; if(n.getAttribute('data-done'))continue;
+    try{ window.katex.render(n.getAttribute('data-tex'), n, {displayMode:n.classList.contains('eq'), throwOnError:false}); n.setAttribute('data-done','1'); }catch(e){} }
+}
+window.__renderMath=renderMath; if(window.katex) renderMath();
+
+function setupCanvas(canvas){
+  function resize(){
+    var dpr=window.devicePixelRatio||1, w=canvas.clientWidth||canvas.parentNode.clientWidth, h=parseInt(canvas.getAttribute('height'),10)||220;
+    canvas.style.height=h+'px'; canvas.width=Math.round(w*dpr); canvas.height=Math.round(h*dpr);
+    var ctx=canvas.getContext('2d'); ctx.setTransform(dpr,0,0,dpr,0,0); canvas._w=w; canvas._h=h; return ctx;
+  }
+  var ctx=resize(), t=null;
+  window.addEventListener('resize',function(){ clearTimeout(t); t=setTimeout(function(){ ctx=resize(); if(canvas._redraw)canvas._redraw(); },120); });
+  canvas._ctx=function(){ return ctx; }; return canvas;
+}
+function roundRect(ctx,x,y,w,h,r){ ctx.beginPath(); ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r); ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath(); }
+function bodyFont(){ return '"Instrument Sans", system-ui, sans-serif'; }
+function dispFont(){ return '"Bricolage Grotesque", system-ui, sans-serif'; }
+function monoFont(){ return '"IBM Plex Mono", ui-monospace, monospace'; }
+function hexA(hex,a){ hex=(hex||'#000').replace('#',''); if(hex.length===3)hex=hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2]; var r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16); return 'rgba('+r+','+g+','+b+','+a+')'; }
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+/* ============ S1 — pipeline stepper ============ */
+(function(){
+  var canvas=el('pipeCanvas'); if(!canvas) return; setupCanvas(canvas);
+  var stages=[
+    {t:'Upload', s:'.pdf / .docx', c:C.data, cap:'A candidate uploads a résumé file — the only input the system needs.'},
+    {t:'Extract', s:'raw text', c:C.parse, cap:'The document processor pulls the raw words out of the PDF or Word file.'},
+    {t:'LLM parse', s:'Gemini', c:C.parse, cap:'Gemini reads the text against a schema and returns structured fields — experience, skills, education, dates.'},
+    {t:'Derive', s:'metrics', c:C.data, cap:'Deterministic code adds total experience, tenure, and job switches — numbers the LLM shouldn’t guess.'},
+    {t:'Match', s:'vs rubric', c:C.match, cap:'The profile is scored against the job’s weighted rubric, requirement by requirement.'},
+    {t:'Score', s:'saved', c:C.match, cap:'One overall score (plus per-requirement evidence) is stored — the candidate is now ranked.'}
+  ];
+  var cur=0;
+  function draw(){
+    var ctx=canvas._ctx(), w=canvas._w, h=canvas._h; ctx.clearRect(0,0,w,h);
+    var n=stages.length, pad=14, bw=(w-pad*(n+1))/n, y=h/2-30, bh=60;
+    for(var i=0;i<n;i++){
+      var x=pad+i*(bw+pad), st=stages[i], active=i<=cur;
+      if(i<n-1){ ctx.strokeStyle=i<cur?st.c:C.hair; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(x+bw,y+bh/2); ctx.lineTo(x+bw+pad,y+bh/2); ctx.stroke(); }
+      ctx.globalAlpha=active?1:0.4;
+      ctx.fillStyle=active?hexA(st.c,0.14):'#fff'; roundRect(ctx,x,y,bw,bh,9); ctx.fill();
+      ctx.strokeStyle=active?st.c:C.hair; ctx.lineWidth=i===cur?2:1.3; ctx.stroke();
+      ctx.globalAlpha=1;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillStyle=active?st.c:C.soft; ctx.font='700 13px '+dispFont(); ctx.fillText(st.t, x+bw/2, y+bh/2-8);
+      ctx.fillStyle=C.soft; ctx.font='500 9.5px '+monoFont(); ctx.fillText(st.s, x+bw/2, y+bh/2+11);
+      ctx.fillStyle=active?st.c:C.hair; ctx.font='600 10px '+monoFont(); ctx.textBaseline='alphabetic';
+      ctx.fillText(String(i+1), x+bw/2, y-8);
+    }
+    ctx.textAlign='left';
+  }
+  canvas._redraw=draw;
+  function upd(){ el('pipeCaption').innerHTML='<b>'+(cur+1)+'. '+stages[cur].t+'</b> — '+stages[cur].cap; el('pipeNext').textContent = cur>=stages.length-1?'Done ✓':'Next stage →'; draw(); }
+  on('pipeNext','click',function(){ if(cur<stages.length-1) cur++; upd(); });
+  on('pipeReset','click',function(){ cur=0; upd(); });
+  upd();
+})();
+
+/* ============ S2 — parse blob→fields + cost ============ */
+(function(){
+  var IN={
+    clean:'John Doe\nSenior Software Engineer\nAcme Corp | Jan 2019 - Present\n- Built microservices in Java & Spring Boot\n- Deployed on Kubernetes (GKE)\nSkills: Java, Spring Boot, Kubernetes, AWS',
+    messy:'J. DOE  //  Sr. SWE II  //  bangalore\nACME (2019-now) prev: Globex 16-19\njava/springboot microservices, k8s on gke,\nsome aws. B.Tech CSE 2015'
+  };
+  var OUT={
+    clean:'{\n  "contact": { "location": "—" },\n  "current_title": "Senior Software Engineer",\n  "experience": [\n    { "company": "Acme Corp",\n      "title": "Senior Software Engineer",\n      "from": "2019-01", "to": "Present",\n      "technologies": ["Java","Spring Boot","Kubernetes"] }\n  ],\n  "skills": { "languages": ["Java"],\n    "platforms": ["Kubernetes","AWS"] }\n}',
+    messy:'{\n  "contact": { "location": "Bangalore" },\n  "current_title": "Senior Software Engineer",\n  "experience": [\n    { "company": "Acme", "from": "2019", "to": "Present",\n      "technologies": ["Java","Spring Boot","Kubernetes"] },\n    { "company": "Globex", "from": "2016", "to": "2019" }\n  ],\n  "education": [{ "degree": "B.Tech", "field_of_study": "CSE" }],\n  "skills": { "platforms": ["Kubernetes","AWS"] }\n}'
+  };
+  function fmt(s){ return esc(s).replace(/(&quot;[^&]*?&quot;|"[^"]*")/g,'<span class="st">$&</span>').replace(/\b(from|to|company|title|degree|location|technologies|skills|experience|contact|current_title|education|field_of_study|languages|platforms)\b(?=&quot;|":|\s*:)/g,'<span class="kw">$1</span>'); }
+  var style='clean';
+  function render(){ el('parseIn').textContent=IN[style]; el('parseOut').innerHTML=fmt(OUT[style]); }
+  el('parseStyle').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b)return; var on=this.querySelector('.on'); if(on)on.classList.remove('on'); b.classList.add('on'); style=b.getAttribute('data-s'); render(); });
+  render();
+
+  var RIN=0.30, ROUT=2.50; // $ / Mtok, illustrative
+  function fnum(n){ return n.toLocaleString('en-US'); }
+  function cost(){
+    var p=parseInt(el('tokP').value,10), c=parseInt(el('tokC').value,10);
+    el('tokPv').textContent=fnum(p); el('tokCv').textContent=fnum(c); el('tokTotal').textContent=fnum(p+c);
+    var usd=(p*RIN + c*ROUT)/1000000;
+    el('tokCost').textContent='$'+usd.toFixed(4);
+  }
+  on('tokP','input',cost); on('tokC','input',cost); cost();
+})();
+
+/* ============ S3 — experience union ============ */
+(function(){
+  var canvas=el('expCanvas'); if(!canvas) return; setupCanvas(canvas);
+  var YMIN=2010, YMAX=2025;
+  function get(id){ return parseInt(el(id).value,10); }
+  function clampPair(sId,eId){ var s=get(sId),e=get(eId); if(e<=s){ e=s+1; el(eId).value=e; } return [s,e]; }
+  function draw(){
+    var ctx=canvas._ctx(), w=canvas._w, h=canvas._h; ctx.clearRect(0,0,w,h);
+    var L=44, R=w-16, span=YMAX-YMIN;
+    function X(y){ return L+(R-L)*(y-YMIN)/span; }
+    // axis
+    ctx.strokeStyle=C.hair; ctx.lineWidth=1; ctx.fillStyle=C.soft; ctx.font='500 10px '+monoFont(); ctx.textAlign='center';
+    for(var yr=YMIN; yr<=YMAX; yr+=5){ var x=X(yr); ctx.beginPath(); ctx.moveTo(x,24); ctx.lineTo(x,h-20); ctx.stroke(); ctx.fillText(String(yr), x, h-6); }
+    var a=clampPair('aStart','aEnd'), b=clampPair('bStart','bEnd');
+    el('aStartV').textContent=a[0]; el('aEndV').textContent=a[1]; el('bStartV').textContent=b[0]; el('bEndV').textContent=b[1];
+    function bar(iv,y,c,label){ var x0=X(iv[0]), x1=X(iv[1]); ctx.fillStyle=hexA(c,0.85); roundRect(ctx,x0,y,Math.max(3,x1-x0),26,6); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='600 11px '+bodyFont(); ctx.textAlign='left'; ctx.textBaseline='middle'; if(x1-x0>60) ctx.fillText(label,x0+8,y+13); ctx.textBaseline='alphabetic'; }
+    bar(a,40,C.data,'Job A'); bar(b,74,C.parse,'Job B');
+    // union band
+    var us=Math.min(a[0],b[0]), ue=Math.max(a[1],b[1]);
+    var overlap = a[0]<b[1] && b[0]<a[1];
+    ctx.fillStyle=hexA(C.match,0.16); var ux0=X(us), ux1=X(ue); roundRect(ctx,ux0,112,ux1-ux0,20,5); ctx.fill();
+    ctx.strokeStyle=C.match; ctx.setLineDash([4,3]); ctx.lineWidth=1.3; ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle=C.match; ctx.font='600 10px '+monoFont(); ctx.textAlign='left'; ctx.fillText('merged union', ux0+6, 126);
+    ctx.textAlign='left';
+    // numbers
+    var sum=(a[1]-a[0])+(b[1]-b[0]);
+    var union = overlap ? (ue-us) : ((a[1]-a[0])+(b[1]-b[0]));
+    el('expSum').textContent=sum+' yr'; el('expUnion').textContent=union+' yr';
+    el('expSwitch').textContent=1; // two distinct companies -> max(0,2-1)=1
+  }
+  canvas._redraw=draw;
+  ['aStart','aEnd','bStart','bEnd'].forEach(function(id){ on(id,'input',draw); });
+  draw();
+})();
+
+/* ============ S4 — one rule JSON ============ */
+(function(){
+  var pre=el('ruleJson'); if(!pre) return;
+  var txt='"location": {\n  "data": ["Bangalore", "Pune", "Hyderabad", "Remote"],\n  "type": "str",\n  "matchreq": "jaccard",\n  "weightage": 5,\n  "sourcecondition": "OR",\n  "profiledatasource": ["contact.location"]\n}';
+  pre.innerHTML=esc(txt)
+    .replace(/(&quot;[^&]*?&quot;|"[^"]*")/g,'<span class="st">$&</span>')
+    .replace(/\b(data|type|matchreq|weightage|sourcecondition|profiledatasource|location)\b(?=&quot;|"|\s*:)/g,'<span class="kw">$1</span>')
+    .replace(/\b(5)\b/g,'<span class="nm">$1</span>');
+})();
+
+/* ============ S5 — matcher playground ============ */
+(function(){
+  var body=el('matchBody'); if(!body) return;
+  var cur='jaccard';
+
+  function tokenize(s){ return (s||'').toLowerCase().split(/[^a-z0-9+#.]+/).filter(Boolean); }
+  function setFrom(s){ var o={},t=tokenize(s); for(var i=0;i<t.length;i++)o[t[i]]=1; return Object.keys(o); }
+
+  function jaccardUI(){
+    body.innerHTML=
+      '<div class="controls"><div class="knob" style="flex:1; min-width:220px"><label>JD wants (comma tags)</label><input class="tinput" id="jjA" value="java, aws, kubernetes, python, docker"></div>'+
+      '<div class="knob" style="flex:1; min-width:220px"><label>Candidate has (comma tags)</label><input class="tinput" id="jjB" value="java, kubernetes, gcp, docker"></div></div>'+
+      '<div class="readout"><span class="big-metric dat"><b id="jjInt">—</b>in both (∩)</span><span class="big-metric"><b id="jjUni">—</b>in either (∪)</span><span class="big-metric mat"><b id="jjScore">—</b>Jaccard score</span></div>'+
+      '<p class="note" id="jjNote" style="margin-bottom:0"></p>';
+    function tags(v){ return v.split(',').map(function(x){return x.trim().toLowerCase();}).filter(Boolean); }
+    function calc(){
+      var A=tags(el('jjA').value), B=tags(el('jjB').value), sa={},sb={},i;
+      for(i=0;i<A.length;i++)sa[A[i]]=1; for(i=0;i<B.length;i++)sb[B[i]]=1;
+      var inter=[],uni={}; for(var k in sa){uni[k]=1; if(sb[k])inter.push(k);} for(var k2 in sb)uni[k2]=1;
+      var u=Object.keys(uni).length, sc=u?inter.length/u:0;
+      el('jjInt').textContent=inter.length; el('jjUni').textContent=u; el('jjScore').textContent=Math.round(sc*100)+'%';
+      el('jjNote').innerHTML='Overlap: <b>'+(inter.join(', ')||'none')+'</b>. Jaccard = '+inter.length+' ÷ '+u+' = '+(sc).toFixed(2)+'. Great for tag lists; blind to meaning — "gcp" ≠ "aws" here even though both are clouds.';
+    }
+    on('jjA','input',calc); on('jjB','input',calc); calc();
+  }
+  function vectorUI(){
+    body.innerHTML=
+      '<div class="controls"><div class="knob" style="flex:1; min-width:220px"><label>JD text</label><input class="tinput" id="vvA" value="design scalable cloud native microservices on kubernetes"></div>'+
+      '<div class="knob" style="flex:1; min-width:220px"><label>Candidate summary</label><input class="tinput" id="vvB" value="architected cloud native services and microservices running on kubernetes clusters"></div></div>'+
+      '<div class="readout"><span class="big-metric par"><b id="vvScore">—</b>cosine similarity</span><span class="big-metric"><b id="vvShared">—</b>shared words</span></div>'+
+      '<p class="note" id="vvNote" style="margin-bottom:0"></p>';
+    function calc(){
+      var a=setFrom(el('vvA').value), b=el('vvB').value.toLowerCase(), bt=tokenize(el('vvB').value);
+      // bag-of-words cosine over the union vocabulary (real, if simple)
+      var A=tokenize(el('vvA').value), B=bt, vocab={},i;
+      for(i=0;i<A.length;i++)vocab[A[i]]=1; for(i=0;i<B.length;i++)vocab[B[i]]=1;
+      var keys=Object.keys(vocab), ca={},cb={}; keys.forEach(function(k){ca[k]=0;cb[k]=0;});
+      A.forEach(function(k){ca[k]++;}); B.forEach(function(k){cb[k]++;});
+      var dot=0,na=0,nb=0,shared=0; keys.forEach(function(k){ dot+=ca[k]*cb[k]; na+=ca[k]*ca[k]; nb+=cb[k]*cb[k]; if(ca[k]>0&&cb[k]>0)shared++; });
+      var cos=(na&&nb)?dot/(Math.sqrt(na)*Math.sqrt(nb)):0;
+      el('vvScore').textContent=Math.round(cos*100)+'%'; el('vvShared').textContent=shared;
+      el('vvNote').innerHTML='Both texts become word-count vectors; the score is the cosine of the angle between them. The real service uses learned embeddings (meaning, not just shared words) so paraphrases score high even with different vocabulary — this bag-of-words version is the same idea, simplified to run live.';
+    }
+    on('vvA','input',calc); on('vvB','input',calc); calc();
+  }
+  function operatorUI(){
+    body.innerHTML=
+      '<div class="controls"><div class="knob"><label>Requirement</label><div class="seg" id="opCmp"><button class="on" data-c=">=">&ge;</button><button data-c=">">&gt;</button><button data-c="<">&lt;</button></div></div>'+
+      '<div class="knob"><label>threshold (years) <span class="val" id="opTv">10</span></label><input type="range" id="opT" min="0" max="20" value="10" step="1"></div>'+
+      '<div class="knob"><label>candidate has <span class="val" id="opXv">12</span></label><input type="range" id="opX" min="0" max="25" value="12" step="1"></div></div>'+
+      '<div class="readout"><span class="big-metric" id="opWrap"><b id="opScore">—</b>score (pass / fail)</span></div>'+
+      '<p class="note" id="opNote" style="margin-bottom:0"></p>';
+    var cmp='>=';
+    el('opCmp').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b)return; var o=this.querySelector('.on'); if(o)o.classList.remove('on'); b.classList.add('on'); cmp=b.getAttribute('data-c'); calc(); });
+    function calc(){
+      var t=parseInt(el('opT').value,10), x=parseInt(el('opX').value,10); el('opTv').textContent=t; el('opXv').textContent=x;
+      var pass = cmp==='>=' ? x>=t : cmp==='>' ? x>t : x<t;
+      el('opScore').textContent = pass?'100%':'0%';
+      el('opWrap').className='big-metric '+(pass?'mat':'err');
+      el('opNote').innerHTML = 'A hard gate: candidate’s '+x+' '+cmp+' '+t+' is <b>'+(pass?'true → 100%':'false → 0%')+'</b>. No partial credit — this is how a must-have like minimum experience knocks unqualified profiles down hard.';
+    }
+    on('opT','input',calc); on('opX','input',calc); calc();
+  }
+  function crossUI(){
+    var pairs=[['Kubernetes','GKE',0.94],['Golang','Go',0.97],['kafka','Apache Kafka',0.98],['Python 3','Python',0.99],['aws','gcp',0.55],['Java','JavaScript',0.42],['grafana','grapfana (typo)',0.9]];
+    var rows=pairs.map(function(p){ var pct=Math.round(p[2]*100); var c=p[2]>0.8?'var(--match)':p[2]>0.5?'var(--weight)':'var(--err)'; return '<div class="row" style="grid-template-columns:1fr 1fr 70px"><span class="rname">'+esc(p[0])+'</span><span class="rname" style="font-weight:400">'+esc(p[1])+'</span><span class="rscore" style="color:'+c+'">'+pct+'%</span></div>'; }).join('');
+    body.innerHTML='<p class="note" style="margin-top:0">A cross-encoder reads <em>both</em> strings together and rates how alike they mean — so it links tech that shares no letters, and shrugs off typos. Illustrative scores:</p><div class="rows">'+rows+'</div>'+
+      '<p class="note" style="margin-bottom:0">Plain Jaccard would score every one of these <b>0%</b> (no shared exact tokens). That gap is why skills and certifications use the cross-encoder, not set overlap.</p>';
+  }
+  var UIS={jaccard:jaccardUI, vector:vectorUI, operator:operatorUI, cross:crossUI};
+  el('matchTabs').addEventListener('click',function(e){ var b=e.target.closest('button'); if(!b)return; var o=this.querySelector('.on'); if(o)o.classList.remove('on'); b.classList.add('on'); cur=b.getAttribute('data-m'); UIS[cur](); });
+  jaccardUI();
+})();
+
+/* ============ S6 — weighted scorecard ============ */
+(function(){
+  var host=el('scoreRows'); if(!host) return;
+  var reqs=[
+    {name:'Technical skills', method:'cross', w:5, s:82},
+    {name:'Key responsibilities', method:'vector', w:5, s:74},
+    {name:'Years of experience', method:'operator', w:5, s:100},
+    {name:'Target job titles', method:'jaccard', w:5, s:88},
+    {name:'Certifications', method:'cross', w:3, s:60},
+    {name:'Soft skills', method:'cross', w:4, s:70},
+    {name:'Organisation switches', method:'operator', w:1, s:0}
+  ];
+  var MLABEL={cross:'cross-enc', vector:'vector', jaccard:'jaccard', operator:'operator'};
+  function build(){
+    host.innerHTML='';
+    reqs.forEach(function(r,idx){
+      var row=document.createElement('div'); row.className='row';
+      row.innerHTML='<div><div class="rname">'+r.name+'</div><span class="rmethod m-'+r.method+'">'+MLABEL[r.method]+'</span></div>'+
+        '<div class="wcell"><label class="note" style="font-size:10px">weight <b id="wv'+idx+'">'+r.w+'</b></label><input type="range" id="w'+idx+'" min="1" max="5" value="'+r.w+'" step="1"></div>'+
+        '<div><label class="note" style="font-size:10px">score <b id="sv'+idx+'">'+r.s+'</b>%</label><input type="range" id="s'+idx+'" min="0" max="100" value="'+r.s+'" step="1" style="accent-color:var(--match)"></div>'+
+        '<div class="rscore" id="rc'+idx+'">—</div>';
+      host.appendChild(row);
+    });
+    reqs.forEach(function(r,idx){ on('w'+idx,'input',function(){ r.w=parseInt(this.value,10); el('wv'+idx).textContent=r.w; calc(); }); on('s'+idx,'input',function(){ r.s=parseInt(this.value,10); el('sv'+idx).textContent=r.s; calc(); }); });
+  }
+  function calc(){
+    var num=0, den=0, sum=0;
+    reqs.forEach(function(r,idx){ num+=r.s*r.w; den+=r.w; sum+=r.s; var contrib=r.w; el('rc'+idx).textContent='×'+r.w; });
+    var weighted= den? num/den : 0, avg= reqs.length? sum/reqs.length : 0;
+    el('ovWeighted').textContent=Math.round(weighted)+'%';
+    el('ovAverage').textContent=Math.round(avg)+'%';
+  }
+  build(); calc();
+})();
+
+/* ============ scroll: progress rail active + reveal ============ */
+(function(){
+  var links=document.querySelectorAll('#rail a'), secs=[];
+  for(var i=0;i<links.length;i++){ var t=el(links[i].getAttribute('data-sec')); if(t) secs.push({elm:t, link:links[i]}); }
+  function onScroll(){
+    var d=document.documentElement, sc=d.scrollTop||document.body.scrollTop, mid=sc+window.innerHeight*0.35, active=secs.length?secs[0]:null;
+    for(var i=0;i<secs.length;i++){ if(secs[i].elm.offsetTop<=mid) active=secs[i]; }
+    for(var j=0;j<secs.length;j++) secs[j].link.classList.toggle('active', active&&secs[j]===active);
+  }
+  window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); },{rootMargin:'0px 0px -12% 0px'});
+    var revs=document.querySelectorAll('.reveal'); for(var k=0;k<revs.length;k++) io.observe(revs[k]);
+  } else { var r2=document.querySelectorAll('.reveal'); for(var m=0;m<r2.length;m++) r2[m].classList.add('in'); }
+})();
+</script>
+
+<!-- ===== engagement module JS ===== -->
+<script>
+(function(){
+  var CONFIGURED=!!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && CONFIG.SUPABASE_URL.indexOf('supabase.co')!==-1 && CONFIG.SUPABASE_ANON_KEY.indexOf('YOUR_')!==0);
+  var sb=null;
+  function initClient(){ if(!CONFIGURED||!window.supabase||sb)return; sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY); loadLikeCounts(); loadComments(); }
+  window.__sbReady=initClient;
+  var LS_EMAIL='groundwork_email', LS_NAME='groundwork_name';
+  function getIdentity(){ try{ var e=localStorage.getItem(LS_EMAIL); return e?{email:e,name:localStorage.getItem(LS_NAME)||''}:null; }catch(err){ return null; } }
+  function saveIdentity(email,name){ try{ localStorage.setItem(LS_EMAIL,email); localStorage.setItem(LS_NAME,name||''); }catch(err){} }
+  var pendingAction=null;
+  function openModal(action){ pendingAction=action; el('mErr').textContent=''; el('emailModalBg').removeAttribute('hidden'); el('mEmail').focus(); }
+  function closeModal(){ el('emailModalBg').setAttribute('hidden',''); pendingAction=null; }
+  on('mCancel','click',closeModal);
+  on('mContinue','click',function(){
+    var email=el('mEmail').value.trim(), name=el('mName').value.trim();
+    if(!name){ el('mErr').textContent='Please enter your name.'; return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ el('mErr').textContent='Please enter a valid email address.'; return; }
+    saveIdentity(email,name);
+    if(CONFIGURED&&sb){ sb.from('subscribers').insert({email:email, article_id:CONFIG.ARTICLE_ID}).then(function(){}); }
+    var act=pendingAction; closeModal(); if(act) act({email:email,name:name});
+  });
+  function requireIdentity(action){ var id=getIdentity(); if(id) action(id); else openModal(action); }
+  function renderLikeButtons(){
+    var secs=document.querySelectorAll('section.chapter[id^="s"]');
+    for(var i=0;i<secs.length;i++){ var sec=secs[i], h2=sec.querySelector('h2'); if(!h2)continue;
+      var btn=document.createElement('button'); btn.type='button'; btn.className='likebtn'; btn.setAttribute('data-sec',sec.id);
+      btn.innerHTML='<span class="hrt">🤍</span><span class="cnt">0</span> like this section';
+      h2.insertAdjacentElement('afterend',btn);
+      (function(btn,secId){ btn.addEventListener('click',function(){ if(btn.classList.contains('liked'))return; requireIdentity(function(id){ doLike(secId,btn,id); }); }); })(btn,sec.id);
+    }
+  }
+  function doLike(sectionId,btn,id){
+    btn.classList.add('liked'); btn.querySelector('.hrt').textContent='❤';
+    var cnt=btn.querySelector('.cnt'); cnt.textContent=(parseInt(cnt.textContent,10)||0)+1;
+    try{ localStorage.setItem('groundwork_liked_'+CONFIG.ARTICLE_ID+'_'+sectionId,'1'); }catch(e){}
+    if(CONFIGURED&&sb){ sb.from('likes').insert({article_id:CONFIG.ARTICLE_ID, section_id:sectionId, email:id.email}).then(function(res){ if(res&&res.error&&!/duplicate/i.test(res.error.message||'')) console.warn('like failed',res.error); }); }
+  }
+  function restoreLikedState(){ var btns=document.querySelectorAll('.likebtn'); for(var i=0;i<btns.length;i++){ var sid=btns[i].getAttribute('data-sec'); try{ if(localStorage.getItem('groundwork_liked_'+CONFIG.ARTICLE_ID+'_'+sid)==='1'){ btns[i].classList.add('liked'); btns[i].querySelector('.hrt').textContent='❤'; } }catch(e){} } }
+  function loadLikeCounts(){ if(!(CONFIGURED&&sb))return; sb.from('likes').select('section_id').eq('article_id',CONFIG.ARTICLE_ID).then(function(res){ if(!res||res.error||!res.data)return; var counts={}; for(var i=0;i<res.data.length;i++){ var s=res.data[i].section_id; counts[s]=(counts[s]||0)+1; } var btns=document.querySelectorAll('.likebtn'); for(var j=0;j<btns.length;j++){ var sid=btns[j].getAttribute('data-sec'); btns[j].querySelector('.cnt').textContent=counts[sid]||0; } }); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function renderComment(c){ var div=document.createElement('div'); div.className='ccard'; var name=(c.name&&c.name.length)?escapeHtml(c.name):'Anonymous'; div.innerHTML='<div class="cname">'+name+'</div><div class="cbody">'+escapeHtml(c.body)+'</div>'; return div; }
+  function loadComments(){ if(!(CONFIGURED&&sb))return; sb.from('comments').select('name,body,created_at').eq('article_id',CONFIG.ARTICLE_ID).eq('section_id','general').eq('approved',true).order('created_at',{ascending:false}).then(function(res){ if(!res||res.error||!res.data)return; var list=el('cList'); list.innerHTML=''; for(var i=0;i<res.data.length;i++) list.appendChild(renderComment(res.data[i])); }); }
+  on('cSubmit','click',function(){
+    var body=el('cBody').value.trim(); if(!body){ el('cStatus').textContent='Write something first.'; return; }
+    requireIdentity(function(id){
+      el('cStatus').textContent='Posting…'; var localC={name:id.name,body:body};
+      if(CONFIGURED&&sb){ sb.from('comments').insert({article_id:CONFIG.ARTICLE_ID, section_id:'general', email:id.email, name:id.name, body:body}).then(function(res){ if(res&&res.error){ el('cStatus').textContent='Could not post — please try again.'; return; } el('cList').insertBefore(renderComment(localC),el('cList').firstChild); el('cBody').value=''; el('cStatus').textContent='Posted — it\'ll appear for other visitors after a quick review.'; }); }
+      else { el('cList').insertBefore(renderComment(localC),el('cList').firstChild); el('cBody').value=''; el('cStatus').textContent='Posted on this screen only — backend not configured yet, see setup notes above.'; }
+    });
+  });
+  if(!CONFIGURED){ var note=el('commentsConfigNote'); if(note) note.removeAttribute('hidden'); }
+  renderLikeButtons(); restoreLikedState();
+  if(CONFIGURED&&window.supabase) initClient();
+})();
+</script>
+
+<!-- ===== narrator module JS ===== -->
+<script>
+(function(){
+  var fab=document.getElementById('narrFab'), panel=document.getElementById('narrPanel'); if(!fab) return;
+  function el(id){ return document.getElementById(id); }
+  function on(id,ev,fn){ var e=el(id); if(e) e.addEventListener(ev,fn); }
+  var supported=('speechSynthesis' in window);
+  var TITLES={ top:'Introduction', s1:'Parse, then match', s2:'Résumé to data', s3:'Math on time', s4:'The rubric', s5:'Three matchers', s6:'One score', s7:'Recap & pitfalls' };
+  var SCRIPTS={
+    top:"Welcome. Behind every 'best match, 87 percent' badge on a hiring dashboard sits a real pipeline. Over the next few minutes we'll build it from scratch: an AI reads each résumé into structured data, a job description becomes a weighted checklist, and every candidate gets compared and scored against it — with the reasoning kept, not hidden. Let's start with the shape of the whole thing.",
+    s1:"The problem splits cleanly in two. First, parse: turn every messy résumé into the same tidy structured profile, so two people can be compared field by field. Then, match: turn the job description into a rubric and score each profile against it. Step through the pipeline on screen — upload, extract, the language model parse, the derived metrics, the match, and the saved score.",
+    s2:"The parse endpoint looks tiny from outside — you post a PDF or Word file and get back JSON. Inside, a language model does the reading. Why a model and not rules? Because résumés don't follow rules. Senior Software Engineer, Sr SWE two, Software Eng L5 — all the same job. A model reads intent where a regex only catches what you thought to anticipate. Flip the messy-résumé toggle and watch the same fields still fill in.",
+    s3:"Some numbers you never let the model guess — you compute them yourself. Take years of experience. People hold overlapping jobs, so if you just add the durations you'll credit a ten-year career with fifteen years. The fix is interval merging: lay the jobs on a timeline, fuse the overlaps, and measure the union. Drag the two jobs and watch the naïve sum drift away from the honest total.",
+    s4:"Now the other half. A job description in prose can't be scored, so it becomes a rubric — a list of small explicit rules. Each rule says four things: what to look for, how to compare it, how much it matters from one to five, and where in the candidate's profile to look. That last part is quietly powerful: one requirement can point at several places, and the matcher keeps the best score across them.",
+    s5:"Here's the heart of it: different requirements are compared in different ways. A list of skills, a paragraph about the role, and a ten-plus-years bar are different kinds of thing. Jaccard measures overlap between tag sets. Vector similarity measures meaning, so paraphrases still match. An operator is a hard numeric gate — pass or fail. And a cross-encoder reads two strings together to see that Kubernetes and G-K-E mean the same, even sharing no letters. Try each one.",
+    s6:"Every requirement now has a score from zero to a hundred. The last step blends them — but weighted, not a flat average, because a must-have shouldn't count the same as a nice-to-have. Multiply each score by its weight, add them up, divide by the total weight. Drag the sliders and watch a low score on a heavy row do real damage — that's a hard gate at work. And every number keeps its evidence, so 'why 72 percent' always has an answer.",
+    s7:"So: parse into a profile, turn the job into a weighted rubric, match each requirement with the right method, and roll it all into one explainable score. Mind the pitfalls — garbage in from a bad scan poisons everything downstream, some signals are proxies not facts, the judgement really lives in the weights, and using the wrong matcher silently drops good people. Done well, it hands the recruiter a ranked, reasoned shortlist — and their afternoon back."
+  };
+  var narrationOn=false, currentId=null, lastVisible='top';
+  function setSpeakingUI(id,speaking){ fab.classList.toggle('speaking',!!speaking); var links=document.querySelectorAll('#rail a'); for(var i=0;i<links.length;i++) links[i].classList.toggle('speaking', speaking && links[i].getAttribute('data-sec')===id); }
+  function statusIdle(){ el('narrStatus').textContent = narrationOn?'On — narrating as you scroll.':'Off — press "Turn on" to begin.'; }
+  function statusSpeaking(id){ el('narrStatus').innerHTML='Speaking — <b>'+(TITLES[id]||id)+'</b>'; }
+  function getSelectedVoice(){ if(!supported)return null; var val=el('narrVoice').value, voices=window.speechSynthesis.getVoices(); for(var i=0;i<voices.length;i++){ if(voices[i].name+'|'+voices[i].lang===val) return voices[i]; } return voices[0]||null; }
+  function populateVoices(){ if(!supported)return; var voices=window.speechSynthesis.getVoices(); if(!voices.length)return; var sel=el('narrVoice'); if(sel.options.length)return; var en=voices.filter(function(v){return /^en/i.test(v.lang);}); var rest=voices.filter(function(v){return !/^en/i.test(v.lang);}); (en.length?en.concat(rest):voices).forEach(function(v){ var o=document.createElement('option'); o.value=v.name+'|'+v.lang; o.textContent=v.name+' ('+v.lang+')'; sel.appendChild(o); }); }
+  if(supported){ populateVoices(); window.speechSynthesis.onvoiceschanged=populateVoices; }
+  function speak(id){ if(!supported)return; var text=SCRIPTS[id]; if(!text)return; window.speechSynthesis.cancel(); var u=new SpeechSynthesisUtterance(text); var v=getSelectedVoice(); if(v)u.voice=v; u.rate=0.98; u.pitch=1; u.onstart=function(){ setSpeakingUI(id,true); statusSpeaking(id); el('narrPauseBtn').disabled=false; el('narrPauseBtn').textContent='Pause'; }; u.onend=function(){ setSpeakingUI(id,false); statusIdle(); }; u.onerror=function(){ setSpeakingUI(id,false); statusIdle(); }; window.speechSynthesis.speak(u); currentId=id; }
+  function turnOn(){ narrationOn=true; el('narrOnOff').textContent='Turn off'; fab.classList.add('active'); statusIdle(); if(lastVisible) speak(lastVisible); }
+  function turnOff(){ narrationOn=false; if(supported) window.speechSynthesis.cancel(); el('narrOnOff').textContent='Turn on'; fab.classList.remove('active'); setSpeakingUI(null,false); el('narrPauseBtn').disabled=true; el('narrPauseBtn').textContent='Pause'; currentId=null; statusIdle(); }
+  if(!supported){ statusIdle(); el('narrStatus').textContent="Voice narration isn't supported in this browser."; el('narrOnOff').disabled=true; el('narrReplay').disabled=true; el('narrPauseBtn').disabled=true; el('narrVoice').disabled=true; } else { statusIdle(); }
+  on('narrFab','click',function(){ var hidden=panel.hasAttribute('hidden'); if(hidden){ panel.removeAttribute('hidden'); fab.setAttribute('aria-expanded','true'); } else { panel.setAttribute('hidden',''); fab.setAttribute('aria-expanded','false'); } });
+  on('narrOnOff','click',function(){ narrationOn?turnOff():turnOn(); });
+  on('narrReplay','click',function(){ var id=currentId||lastVisible; if(id) speak(id); });
+  on('narrPauseBtn','click',function(){ if(!supported||!window.speechSynthesis.speaking)return; if(window.speechSynthesis.paused){ window.speechSynthesis.resume(); el('narrPauseBtn').textContent='Pause'; } else { window.speechSynthesis.pause(); el('narrPauseBtn').textContent='Resume'; } });
+  var secs=document.querySelectorAll('section.chapter, .hero');
+  if('IntersectionObserver' in window){ var nio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ lastVisible=e.target.id; if(narrationOn && lastVisible!==currentId) speak(lastVisible); } }); },{rootMargin:'-25% 0px -55% 0px'}); for(var i=0;i<secs.length;i++) nio.observe(secs[i]); }
+})();
+</script>
+
+<!-- ===== ai-tools module JS ===== -->
+<script>
+(function(){
+  var fab=el('aiCopyFab'); if(!fab) return;
+  var ARTICLE_TITLE="How a résumé becomes a score — search & scoring, from first principles";
+  var ARTICLE_SUMMARY="A from-first-principles walkthrough of a real résumé-matching system, in two halves: a parse endpoint that turns a PDF/DOCX résumé into a structured profile using an LLM plus deterministic derived metrics (experience via merged time intervals, job switches, tenure); and a match service that turns a job description into a weighted rubric and scores each candidate — covering the four match methods (Jaccard set overlap, vector/cosine semantic similarity, numeric operator gates, and cross-encoder semantic skill matching) and the weighted roll-up into one explainable score.";
+  var ARTICLE_MARKDOWN="# How a résumé becomes a score — search & scoring, from first principles\n\nBehind a \"best match: 87%\" badge is a real pipeline with two halves: **parse** each résumé into structured data, then **match** it against a job description turned into a weighted rubric.\n\n## 1. Parse, then match\nEvery résumé is a document built for humans. To rank candidates, a machine must (1) parse each résumé into the same structured profile, then (2) turn the job description into a rubric and score each profile against it. The parse half is one `POST /api/v1/parsewithllm` call; the match half is a service that takes the job's rubric and the candidate's profile and returns a score.\n\n## 2. Turning a résumé into data (the parse endpoint)\nPOST a `.pdf` or `.docx`; get structured JSON. Four steps: validate extension → extract raw text → LLM parse (Gemini reads the text against a schema into fields) → derive metrics. A language model is used instead of rules because résumés don't follow rules ('Sr. SWE II' = 'Senior Software Engineer'). The response includes a `_usage` block; cost is snapshotted at parse time: cost = (prompt_tokens·rate_in + completion_tokens·rate_out) / 1,000,000.\n\n## 3. Doing math on time (derived metrics)\nSome numbers are computed deterministically, not guessed by the LLM. People hold overlapping jobs, so total experience is the length of the **union** of job intervals (overlaps merged, counted once), divided by 365.25 — not the naïve sum. Job switches = max(0, unique_companies − 1). The same merged-interval trick powers per-skill years and 'skills used in the last 6 years'.\n\n## 4. The job description as a weighted rubric\nProse can't be scored, so the JD becomes a list of rules. Each rule has: `data` (what to look for), `matchreq` (how to compare), `weightage` (1–5, how much it matters), and `profiledatasource` (dotted paths to where in the profile to look — the matcher takes the best score across them). `sourcecondition: OR` means matching any listed value is enough. A wizard builds this; the recruiter fills values and tunes weights.\n\n## 5. Three matchers (and a fourth for meaning)\nDifferent requirements need different comparison methods, named per field by `matchreq`:\n- **jaccard** — set overlap for tag lists: J(A,B) = |A∩B| / |A∪B|. Blind to meaning.\n- **vector** — cosine similarity of texts turned into (embedding) vectors: cos = u·v / (|u||v|). Catches paraphrases.\n- **operator** — a hard numeric gate: score = 1 if x ⋈ threshold else 0 (e.g. years ≥ 10).\n- **cross-encoder** — a small neural model reading both strings together; knows Kubernetes ≈ GKE, Golang ≈ Go, and absorbs typos. Skills/keywords use this, not plain Jaccard.\n\n## 6. Rolling up into one score\nEach requirement yields 0–100. The overall is a **weighted** mean, not a flat average: overall_weighted = Σ(sᵢ·wᵢ) / Σ(wᵢ). A hard gate is vivid here — a must-have (weight 5) scoring 0 drags 0×5 through the sum and pulls the total down hard. Every requirement is auditable: the service returns which candidate value it scored and the runners-up it considered.\n\n## 7. Recap, use cases & pitfalls\nUse cases: ranking hundreds of applicants into a sorted/filterable list; explainable screening (each score carries evidence); consistent rubrics applied to every candidate. Pitfalls: garbage-in from bad extraction poisons downstream scores; some signals are proxies (work mode inferred from past job locations → low weight); weight tuning is where the judgement lives; and using the wrong matcher (plain set-overlap on skills) silently drops good candidates whose tech is equivalent but differently named.";
+  var SECTION_SUMMARIES={
+    s1:"The system has two halves: parse each résumé into a structured profile, then match it against a job description turned into a rubric. Parse is one POST /parsewithllm call; match is a separate scoring service.",
+    s2:"The parse endpoint takes a PDF/DOCX and returns structured JSON via four steps (validate, extract text, LLM parse with Gemini, derive metrics); a language model is used because résumés don't follow rules, and the response includes token usage and a snapshotted cost.",
+    s3:"Durations like total experience are computed deterministically as the length of the merged union of job intervals (overlaps counted once) / 365.25, not a naïve sum; job switches = max(0, unique companies − 1).",
+    s4:"A job description becomes a weighted rubric where each requirement specifies data (what to look for), matchreq (how to compare), weightage (1–5), and profiledatasource (where in the profile to look, taking the best score across sources).",
+    s5:"Requirements are compared with different methods: Jaccard set overlap for tag lists, vector/cosine similarity for meaning, numeric operator gates for thresholds, and a cross-encoder for semantic skill matching (Kubernetes ≈ GKE) that plain overlap would miss.",
+    s6:"Per-requirement 0–100 scores roll up into one number via a weighted mean, overall = Σ(score·weight)/Σ(weight); hard gates (weight-5 operators scoring 0) pull it down sharply, and every requirement keeps its evidence for auditability.",
+    s7:"Recap plus use cases (ranking applicants, explainable screening, consistent rubrics) and pitfalls (garbage-in from bad parsing, proxy signals, weight tuning being the real product, and choosing the wrong matcher silently dropping good candidates)."
+  };
+  var PROMPTS={
+    s1:["Why split résumé matching into a 'parse' step and a 'match' step instead of doing it in one pass?","What does the /parsewithllm endpoint take as input and return as output?"],
+    s2:["Why use an LLM to parse résumés instead of regex or rule-based extraction?","How is the cost of a single LLM parse calculated from token counts?"],
+    s3:["Why is total experience computed as a union of time intervals rather than summing job durations?","How would you implement interval merging to avoid double-counting overlapping jobs?"],
+    s4:["Explain the four parts of a match rule: data, matchreq, weightage, and profiledatasource.","Why can one requirement point at several profile fields, and what does 'best score across sources' mean?"],
+    s5:["When should I use Jaccard vs vector similarity vs an operator vs a cross-encoder for matching?","Why would plain Jaccard fail to match 'Kubernetes' against 'GKE', and how does a cross-encoder fix that?"],
+    s6:["Why use a weighted average instead of a plain average to combine requirement scores?","How does a hard operator gate at weight 5 affect the overall weighted score when it fails?"],
+    s7:["What are the main failure modes of an automated résumé-scoring system?","How does keeping per-requirement evidence make candidate scoring auditable and fairer?"]
+  };
+  function copyText(text,btn,doneLabel,restoreLabel){
+    function ok(){ var orig=restoreLabel!==undefined?restoreLabel:btn.innerHTML; btn.innerHTML=doneLabel; if(btn.classList)btn.classList.add('done'); setTimeout(function(){ btn.innerHTML=orig; if(btn.classList)btn.classList.remove('done'); },1800); }
+    function fallback(){ try{ var ta=document.createElement('textarea'); ta.value=text; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); var s=document.execCommand&&document.execCommand('copy'); document.body.removeChild(ta); if(s)ok(); else btn.innerHTML='Copy failed — select & copy manually'; }catch(e){ btn.innerHTML='Copy failed — select & copy manually'; } }
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(ok,fallback); } else { fallback(); }
+  }
+  on('aiCopyFab','click',function(){ copyText(ARTICLE_MARKDOWN, fab, '✓ Copied — paste into your AI', '📋 Copy this article for your AI'); });
+  function buildPrompt(sectionId,question){ var ss=SECTION_SUMMARIES[sectionId]||''; return "Context: I'm reading an interactive article called \""+ARTICLE_TITLE+"\" which covers: "+ARTICLE_SUMMARY+"\n\nThis question is about one section of it"+(ss?(": "+ss):".")+"\n\nMy question: "+question; }
+  function renderAskAI(){
+    var secs=document.querySelectorAll('section.chapter[id^="s"]');
+    for(var i=0;i<secs.length;i++){ var sec=secs[i], prompts=PROMPTS[sec.id]; if(!prompts)continue;
+      var box=document.createElement('div'); box.className='askai';
+      box.innerHTML='<span class="tag">🤖 Ask your AI about this section</span><div class="askrow"></div>';
+      var row=box.querySelector('.askrow');
+      prompts.forEach(function(q){ var chip=document.createElement('button'); chip.type='button'; chip.className='askchip'; chip.innerHTML='<span class="ico">📋</span><span class="txt"></span>'; chip.querySelector('.txt').textContent='“'+q+'”'; (function(sid,qt,ce){ ce.addEventListener('click',function(){ copyText(buildPrompt(sid,qt),ce,'✓ Copied with context'); }); })(sec.id,q,chip); row.appendChild(chip); });
+      var wrap=sec.querySelector('.wrap')||sec; wrap.appendChild(box);
+    }
+  }
+  renderAskAI();
+})();
+</script>
+
+</body>
+</html>
