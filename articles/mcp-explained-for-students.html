@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MCP Explained the Way You'd Actually Ask About It — Groundwork</title>
+<meta name="description" content="A student-friendly, from-first-principles walkthrough of Model Context Protocol — what problem it solves, how it differs from plain function calling, and how the client-server split actually works.">
+<link rel="canonical" href="https://cloudsnativeai.cloud/articles/mcp-explained-for-students.html">
+<meta property="og:type" content="article">
+<meta property="og:title" content="MCP Explained the Way You'd Actually Ask About It">
+<meta property="og:description" content="Model Context Protocol from first principles: the N×M problem, why it isn't function calling, and who talks to whom — client, server, and the LLM.">
+<meta property="og:url" content="https://cloudsnativeai.cloud/articles/mcp-explained-for-students.html">
+<meta name="twitter:card" content="summary_large_image">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Instrument+Sans:ital,wght@0,400;0,500;0,600;1,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F3F6F4; --ink:#16262C; --ink-soft:#41565E; --card:#FFFFFF;
+  --hair:#D9E2DC; --hair-2:#E7EEE9;
+  --r:14px; --shadow:0 1px 2px rgba(22,38,44,.05), 0 8px 24px rgba(22,38,44,.06);
+  --disp:"Bricolage Grotesque", system-ui, sans-serif;
+  --body:"Instrument Sans", system-ui, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, monospace;
+
+  /* Semantic accents — one meaning each */
+  --mcp:#1A7F5A; --mcp-soft:#E1F1EA;    /* the protocol (primary) */
+  --llm:#2563A6; --llm-soft:#E6EEF8;    /* the model / app side */
+  --tool:#C0392B; --tool-soft:#FAE6E3;  /* external services / integrations */
+  --amber:#8A6110;
+  --truth:#1A7F5A;
+  /* aliases so shared modules (--model/--model-soft) work unmodified */
+  --model:var(--mcp); --model-soft:var(--mcp-soft);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0; background:var(--paper); color:var(--ink); font-family:var(--body); font-size:17px; line-height:1.68; -webkit-font-smoothing:antialiased}
+
+.wrap{max-width:800px; margin:0 auto; padding:0 22px}
+main{padding-bottom:60px}
+
+/* rail */
+#rail{position:fixed; top:50%; left:22px; transform:translateY(-50%); z-index:60; display:flex; flex-direction:column; gap:6px}
+#rail a{display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:11px; color:var(--ink-soft); text-decoration:none; padding:3px 8px; border-radius:8px; max-width:34px; overflow:hidden; white-space:nowrap; transition:max-width .2s, background .2s, color .2s}
+#rail a .num{flex:none; width:18px; text-align:right; opacity:.65}
+#rail a .lbl{opacity:0; transition:opacity .2s}
+#rail a:hover,#rail a.active{max-width:250px; background:var(--card); color:var(--ink); box-shadow:var(--shadow)}
+#rail a:hover .lbl,#rail a.active .lbl{opacity:1}
+#rail a.active .num{color:var(--mcp); opacity:1}
+@media (max-width:1200px){ #rail{display:none} }
+
+/* hero */
+.hero{padding:104px 0 42px}
+.hero .eyebrow{color:var(--mcp)}
+.hero h1{font-family:var(--disp); font-weight:800; font-size:clamp(32px,5.5vw,52px); line-height:1.06; letter-spacing:-.02em; margin:.28em 0 .3em}
+.hero .lede{font-size:clamp(18px,2.4vw,21px); color:var(--ink-soft); max-width:64ch}
+.hero .meta{margin-top:22px; font-family:var(--mono); font-size:12.5px; color:var(--ink-soft)}
+
+/* sections */
+.eyebrow{font-family:var(--mono); font-size:12px; letter-spacing:.08em; text-transform:uppercase; color:var(--ink-soft); font-weight:500}
+section.chapter{padding:44px 0; border-top:1px solid var(--hair)}
+section.chapter h2{font-family:var(--disp); font-weight:800; font-size:clamp(24px,4vw,32px); letter-spacing:-.015em; line-height:1.12; margin:.35em 0 .5em}
+section.chapter p{margin:.9em 0}
+section.chapter ul, section.chapter ol{margin:.9em 0; padding-left:22px}
+section.chapter li{margin-bottom:8px}
+strong{font-weight:600}
+em{font-style:italic}
+
+/* code */
+code{font-family:var(--mono); font-size:14px; background:var(--hair-2); padding:2px 6px; border-radius:5px; border:1px solid var(--hair)}
+pre.code{background:#0f1c21; color:#dbe7e4; border-radius:12px; padding:18px 20px; overflow-x:auto; font-family:var(--mono); font-size:13px; line-height:1.6; margin:18px 0}
+pre.code code{background:none; border:none; padding:0; color:inherit; font-size:inherit}
+
+/* figures (preserved SVG diagrams) */
+.figure{margin:24px 0; padding:18px; background:var(--card); border:1px solid var(--hair); border-radius:var(--r); box-shadow:var(--shadow)}
+.figure svg{width:100%; height:auto; display:block}
+.figure-caption{font-size:13.5px; color:var(--ink-soft); text-align:center; margin-top:12px; padding:0 12px}
+
+/* callout */
+.callout{background:var(--mcp-soft); border-left:3px solid var(--mcp); padding:16px 20px; border-radius:0 10px 10px 0; margin:22px 0}
+.callout p{margin:0; font-size:16px}
+
+/* tags */
+.tags{display:flex; flex-wrap:wrap; gap:8px; margin-top:16px}
+.tag-pill{font-family:var(--mono); font-size:12px; background:var(--hair-2); border:1px solid var(--hair); color:var(--ink-soft); padding:4px 11px; border-radius:999px}
+
+.reveal{opacity:0; transform:translateY(14px); transition:opacity .6s ease, transform .6s ease}
+.reveal.in{opacity:1; transform:none}
+@media (prefers-reduced-motion:reduce){ .reveal{opacity:1; transform:none; transition:none} }
+
+footer{border-top:1px solid var(--hair); padding:34px 0 70px; color:var(--ink-soft); font-size:14px}
+footer a{color:var(--mcp)}
+
+/* ===== shared module CSS (engagement / ai-tools / narrator) ===== */
+.likebtn{display:inline-flex; align-items:center; gap:8px; border:1.5px solid var(--hair); background:var(--card); border-radius:999px; padding:7px 16px; font-family:var(--body); font-size:13.5px; font-weight:600; color:var(--ink-soft); cursor:pointer; margin:2px 0 20px; transition:border-color .15s, color .15s, background .15s}
+.likebtn:hover{border-color:var(--model)}
+.likebtn.liked{border-color:var(--model); color:var(--model); background:var(--model-soft); cursor:default}
+.likebtn .hrt{font-size:15px}
+.ctextarea{width:100%; font-family:var(--body); font-size:14.5px; padding:11px 14px; border-radius:10px; border:1.5px solid var(--hair); resize:vertical; background:#FCFDFC}
+.ctextarea:focus{outline:none; border-color:var(--model)}
+.clist{display:flex; flex-direction:column; gap:12px; margin-top:18px}
+.ccard{border:1px solid var(--hair-2); border-radius:10px; padding:12px 15px; background:#FCFDFC}
+.ccard .cname{font-weight:600; font-size:13.5px}
+.ccard .cbody{font-size:14px; margin-top:4px; white-space:pre-wrap; color:var(--ink)}
+.panel{background:var(--card); border:1px solid var(--hair); border-radius:var(--r); padding:20px; margin:22px 0; box-shadow:var(--shadow)}
+.panel .tag{display:inline-block; font-family:var(--mono); font-size:11px; letter-spacing:.05em; text-transform:uppercase; color:var(--ink-soft); background:var(--hair-2); padding:3px 9px; border-radius:999px; margin-bottom:12px}
+.btnrow{display:flex; flex-wrap:wrap; gap:9px; margin-top:14px}
+.btn{border:1.5px solid var(--hair); background:var(--card); color:var(--ink); font-family:var(--body); font-weight:600; font-size:14px; padding:9px 16px; border-radius:10px; cursor:pointer; transition:border-color .15s, background .15s}
+.btn:hover{border-color:var(--mcp)}
+.btn.ghost{color:var(--ink-soft)}
+.btn.orange{background:var(--mcp); border-color:var(--mcp); color:#fff}
+.btn.orange:hover{background:#166a4b; border-color:#166a4b}
+.btn.small{padding:6px 12px; font-size:12.5px}
+.note{font-size:13.5px; color:var(--ink-soft)}
+.modalbg{position:fixed; inset:0; background:rgba(22,38,44,.45); z-index:90; display:flex; align-items:center; justify-content:center; padding:20px}
+.modalbg[hidden]{display:none}
+.modalbox{background:var(--card); border-radius:var(--r); padding:26px; width:min(370px,100%); box-shadow:var(--shadow)}
+.modalbox h4{margin:0 0 6px; font-family:var(--disp); font-weight:700; font-size:17px}
+.modalbox input{width:100%; font-family:var(--body); font-size:14.5px; padding:10px 13px; border-radius:9px; border:1.5px solid var(--hair); margin-top:10px; background:#FCFDFC}
+.modalbox input:focus{outline:none; border-color:var(--model)}
+#aitools{position:fixed; left:20px; bottom:20px; z-index:70; display:flex; flex-direction:column; align-items:flex-start; gap:10px}
+.ai-fab{display:inline-flex; align-items:center; gap:8px; border:none; cursor:pointer; border-radius:999px; background:var(--ink); color:#fff; font-family:var(--body); font-weight:600; font-size:13.5px; padding:12px 18px; box-shadow:var(--shadow); transition:background .15s}
+.ai-fab:hover{background:#0d1a1f}
+.ai-fab.done{background:var(--truth)}
+.askai{margin:14px 0 4px; padding:14px 16px; border:1px dashed var(--hair); border-radius:12px; background:var(--hair-2)}
+.askai .tag{color:var(--ink-soft); background:var(--card)}
+.askrow{display:flex; flex-wrap:wrap; gap:8px; margin-top:8px}
+.askchip{display:inline-flex; align-items:center; gap:7px; max-width:100%; text-align:left; border:1.5px solid var(--hair); background:var(--card); border-radius:10px; padding:8px 12px; font-family:var(--body); font-size:13px; color:var(--ink); cursor:pointer; transition:border-color .15s}
+.askchip:hover{border-color:var(--model)}
+.askchip .ico{flex:none; font-size:13px}
+.askchip.done{border-color:var(--truth); color:var(--truth)}
+@media (max-width:920px){ #aitools{left:12px; bottom:12px} .ai-fab{padding:10px 14px; font-size:12.5px} }
+#narrator{position:fixed; right:20px; bottom:20px; z-index:70; display:flex; flex-direction:column; align-items:flex-end; gap:10px}
+.narr-fab{width:52px; height:52px; border-radius:50%; border:none; cursor:pointer; background:var(--ink); color:#fff; font-size:20px; box-shadow:var(--shadow); display:flex; align-items:center; justify-content:center; transition:background .15s}
+.narr-fab:hover{background:#0d1a1f}
+.narr-fab.active{background:var(--model)}
+.narr-fab.speaking{animation:narrpulse 1.4s ease-in-out infinite}
+@keyframes narrpulse{0%,100%{box-shadow:0 0 0 0 rgba(26,127,90,.45)}50%{box-shadow:0 0 0 10px rgba(26,127,90,0)}}
+@media (prefers-reduced-motion:reduce){ .narr-fab.speaking{animation:none} }
+.narr-panel{width:270px; background:var(--card); border:1px solid var(--hair); border-radius:var(--r); box-shadow:var(--shadow); padding:16px; font-size:13.5px}
+.narr-panel h4{margin:0 0 10px; font-family:var(--disp); font-weight:700; font-size:14.5px}
+.narr-row{display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px}
+.narr-row:last-of-type{margin-bottom:0}
+.narr-row select{flex:1; font-size:13px; padding:6px 8px; border-radius:8px}
+.narr-btnrow{display:flex; gap:8px; margin-top:2px}
+.narr-status{margin-top:10px; padding-top:10px; border-top:1px solid var(--hair-2); color:var(--ink-soft); font-family:var(--mono); font-size:11.5px; min-height:16px}
+.narr-status b{color:var(--model); font-weight:600}
+#rail a .dot{display:none; width:6px; height:6px; border-radius:50%; background:var(--model); margin-left:auto}
+#rail a.speaking .dot{display:inline-block; animation:narrpulse2 1.2s ease-in-out infinite}
+@keyframes narrpulse2{0%,100%{opacity:1}50%{opacity:.25}}
+</style>
+</head>
+<body>
+
+<!-- ===== standardized Groundwork article header (shared across all articles) ===== -->
+<style>
+#gwhead{position:fixed; top:0; left:0; right:0; z-index:70; background:rgba(243,246,244,.9); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); border-bottom:1px solid #D9E2DC}
+#gwhead .inner{max-width:1080px; margin:0 auto; display:flex; align-items:center; gap:16px; padding:9px 20px}
+#gwhead .backBtn{display:inline-flex; align-items:center; gap:5px; font-family:"Bricolage Grotesque",system-ui,sans-serif; font-weight:700; font-size:13px; text-decoration:none; color:#41565E; border:1.5px solid #D9E2DC; border-radius:999px; padding:5px 13px; white-space:nowrap; background:transparent; cursor:pointer; transition:border-color .15s, color .15s}
+#gwhead .backBtn:hover{border-color:#16262C; color:#16262C}
+#gwhead .brand{font-family:"Bricolage Grotesque",system-ui,sans-serif; font-weight:800; font-size:15px; color:#16262C; white-space:nowrap}
+#gwhead .brand span{color:#0FA697; font-weight:700}
+#gwhead .readbar{flex:1; height:8px; min-width:40px; background:#E7EEE9; border:1px solid #D9E2DC; border-radius:999px; overflow:hidden}
+#gwhead .readbar > i{display:block; height:100%; width:0; background:linear-gradient(90deg,#6C4CE0,#0FA697); transition:width .1s linear}
+@media (max-width:560px){ #gwhead .brand span{display:none} }
+@media (max-width:420px){ #gwhead .backBtn .back-label{display:none} }
+</style>
+<header id="gwhead"><div class="inner">
+  <a class="backBtn" href="../index.html" aria-label="Back to all articles">← <span class="back-label">Back</span></a>
+  <div class="brand">Groundwork <span>/ MCP Explained</span></div>
+  <div class="readbar" aria-hidden="true"><i id="readprogFill"></i></div>
+</div></header>
+<script>(function(){var f=document.getElementById('readprogFill');if(!f)return;function u(){var d=document.documentElement;var m=(d.scrollHeight-d.clientHeight)||1;var p=Math.max(0,Math.min(1,(d.scrollTop||window.pageYOffset||0)/m));f.style.width=(p*100).toFixed(1)+'%';}window.addEventListener('scroll',u,{passive:true});window.addEventListener('resize',u);u();})();</script>
+
+<nav id="rail">
+  <a href="#top" data-sec="top"><span class="num">00</span><span class="lbl">Intro</span><span class="dot"></span></a>
+  <a href="#s1" data-sec="s1"><span class="num">01</span><span class="lbl">What problem are we solving?</span><span class="dot"></span></a>
+  <a href="#s2" data-sec="s2"><span class="num">02</span><span class="lbl">Isn't this function calling?</span><span class="dot"></span></a>
+  <a href="#s3" data-sec="s3"><span class="num">03</span><span class="lbl">Client, server &amp; the LLM</span><span class="dot"></span></a>
+  <a href="#s4" data-sec="s4"><span class="num">04</span><span class="lbl">Explain it to a friend</span><span class="dot"></span></a>
+  <a href="#s5" data-sec="s5"><span class="num">05</span><span class="lbl">The takeaway</span><span class="dot"></span></a>
+</nav>
+
+<main>
+<header class="hero wrap" id="top">
+  <span class="eyebrow">AI Engineering · a first-principles explainer</span>
+  <h1>MCP Explained the Way You'd Actually Ask About It</h1>
+  <p class="lede">A student-friendly walkthrough of Model Context Protocol — what problem it solves, how it differs from plain function calling, and how the client-server split actually works.</p>
+  <div class="meta">July 12, 2026 · ~10 min read</div>
+  <p style="margin-top:24px">If you've been building anything with Claude or GPT lately, you've probably heard the term MCP thrown around — Model Context Protocol. Most explanations jump straight into architecture diagrams and protocol specs. This post takes the slower, more honest route: the exact questions a curious developer would ask, in the order they'd ask them, until the picture actually clicks.</p>
+</header>
+
+<!-- ===== S1 ===== -->
+<section class="chapter reveal" id="s1">
+  <div class="wrap">
+    <span class="eyebrow">01 — The problem</span>
+    <h2>First, what problem are we even solving?</h2>
+
+    <p>Imagine you're building an AI app — say, a portfolio tracker that uses Claude to answer "how diversified is my portfolio?" To answer that, Claude can't just <em>think</em> its way to your holdings. It needs to actually fetch data from somewhere — your broker's API, in this case.</p>
+
+    <p>That's the core problem: an LLM is great at reasoning and language, but it can't reach outside itself. Every time it needs real data or needs to <em>do</em> something in the real world, some piece of code has to bridge that gap.</p>
+
+    <p>Here's the mess that shows up once you have more than one AI app and more than one external service, and what changes once MCP sits in the middle:</p>
+
+    <div class="figure">
+      <svg width="900" height="670" viewBox="0 0 900 670" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrowRed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#c0392b" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+          <marker id="arrowGreen" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#1a7f5a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <rect width="900" height="670" fill="#ffffff"/>
+        <text x="450" y="40" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="600" fill="#1a1a1a">Before MCP — every app writes its own integration</text>
+        <rect x="110" y="70" width="150" height="52" rx="10" fill="#eef1f5" stroke="#9aa5b1" stroke-width="1.2"/>
+        <text x="185" y="101" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#2c3e50">Claude App</text>
+        <rect x="640" y="70" width="150" height="52" rx="10" fill="#eef1f5" stroke="#9aa5b1" stroke-width="1.2"/>
+        <text x="715" y="101" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#2c3e50">IDE Agent</text>
+        <rect x="80" y="220" width="140" height="50" rx="8" fill="#fbe9e7" stroke="#c0392b" stroke-width="1"/>
+        <text x="150" y="250" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#8e2b1f">Gmail</text>
+        <rect x="380" y="220" width="140" height="50" rx="8" fill="#fbe9e7" stroke="#c0392b" stroke-width="1"/>
+        <text x="450" y="250" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#8e2b1f">Slack</text>
+        <rect x="680" y="220" width="140" height="50" rx="8" fill="#fbe9e7" stroke="#c0392b" stroke-width="1"/>
+        <text x="750" y="250" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#8e2b1f">GitHub</text>
+        <path d="M195 122 L150 220" fill="none" stroke="#c0392b" stroke-width="1.3" marker-end="url(#arrowRed)"/>
+        <path d="M210 122 L440 220" fill="none" stroke="#c0392b" stroke-width="1.3" marker-end="url(#arrowRed)"/>
+        <path d="M225 122 L730 220" fill="none" stroke="#c0392b" stroke-width="1.3" marker-end="url(#arrowRed)"/>
+        <path d="M675 122 L165 220" fill="none" stroke="#c0392b" stroke-width="1.3" marker-end="url(#arrowRed)"/>
+        <path d="M700 122 L460 220" fill="none" stroke="#c0392b" stroke-width="1.3" marker-end="url(#arrowRed)"/>
+        <path d="M715 122 L760 220" fill="none" stroke="#c0392b" stroke-width="1.3" marker-end="url(#arrowRed)"/>
+        <text x="450" y="305" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#8e2b1f">6 separate, hand-written integrations</text>
+        <line x1="60" y1="335" x2="840" y2="335" stroke="#d9dde2" stroke-width="1.5"/>
+        <text x="450" y="375" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="600" fill="#1a1a1a">After MCP — one shared protocol in the middle</text>
+        <rect x="110" y="405" width="150" height="52" rx="10" fill="#eef1f5" stroke="#9aa5b1" stroke-width="1.2"/>
+        <text x="185" y="436" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#2c3e50">Claude App</text>
+        <rect x="640" y="405" width="150" height="52" rx="10" fill="#eef1f5" stroke="#9aa5b1" stroke-width="1.2"/>
+        <text x="715" y="436" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="600" fill="#2c3e50">IDE Agent</text>
+        <rect x="375" y="490" width="150" height="56" rx="12" fill="#e3f4ec" stroke="#1a7f5a" stroke-width="1.6"/>
+        <text x="450" y="524" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#0f5c40">MCP</text>
+        <path d="M200 457 L410 490" fill="none" stroke="#1a7f5a" stroke-width="1.4" marker-end="url(#arrowGreen)"/>
+        <path d="M700 457 L490 490" fill="none" stroke="#1a7f5a" stroke-width="1.4" marker-end="url(#arrowGreen)"/>
+        <rect x="150" y="590" width="130" height="45" rx="8" fill="#fbe9e7" stroke="#c0392b" stroke-width="1"/>
+        <text x="215" y="618" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#8e2b1f">Gmail</text>
+        <rect x="385" y="590" width="130" height="45" rx="8" fill="#fbe9e7" stroke="#c0392b" stroke-width="1"/>
+        <text x="450" y="618" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#8e2b1f">Slack</text>
+        <rect x="620" y="590" width="130" height="45" rx="8" fill="#fbe9e7" stroke="#c0392b" stroke-width="1"/>
+        <text x="685" y="618" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#8e2b1f">GitHub</text>
+        <path d="M420 546 L235 590" fill="none" stroke="#1a7f5a" stroke-width="1.2" marker-end="url(#arrowGreen)"/>
+        <path d="M450 546 L450 590" fill="none" stroke="#1a7f5a" stroke-width="1.2" marker-end="url(#arrowGreen)"/>
+        <path d="M480 546 L665 590" fill="none" stroke="#1a7f5a" stroke-width="1.2" marker-end="url(#arrowGreen)"/>
+        <text x="450" y="660" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#0f5c40">5 connections total — and adding a new app or tool needs just one more</text>
+      </svg>
+      <div class="figure-caption">Before MCP: every app writes custom code for every tool. After MCP: apps and tools connect through one shared protocol.</div>
+    </div>
+
+    <p>Two apps, three tools, six completely separate pieces of integration code. Add a third app or a fourth tool and the number explodes. This is called the <strong>N × M problem</strong> — N apps, each independently solving the same M integration problems, over and over.</p>
+
+    <p>Once Gmail, Slack, and GitHub each expose themselves through MCP <em>once</em>, any app that speaks MCP — Claude, an IDE agent, anything — can use all of them without writing tool-specific code.</p>
+  </div>
+</section>
+
+<!-- ===== S2 ===== -->
+<section class="chapter reveal" id="s2">
+  <div class="wrap">
+    <span class="eyebrow">02 — The common confusion</span>
+    <h2>"Wait, isn't this what function calling already does?"</h2>
+
+    <p>This is the question that trips most people up, and it's a fair one — because at the surface level, the code you write for a function-calling tool <em>does</em> end up making a remote API call, just like MCP eventually does too.</p>
+
+    <p>Here's the distinction. Function calling (OpenAI's "function calling" and Anthropic's "tool use" are the same underlying idea) solves exactly one problem: <strong>how does the model tell your app what it wants to do?</strong> You describe a function as a JSON schema, the model decides to call it, and returns a structured request instead of guessing in plain text.</p>
+
+    <pre class="code"><code>{
+  "name": "fetch_unread_emails",
+  "description": "Get unread emails from the user's Gmail inbox",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "max_results": { "type": "integer" }
+    }
+  }
+}</code></pre>
+
+    <p>But function calling says nothing about <em>who writes the code that actually executes that function</em>. That part is still on you. In a typical Java app, that looks like:</p>
+
+    <pre class="code"><code>class GmailIntegration {
+    OAuth2Credentials creds;
+
+    List&lt;Email&gt; fetchUnread() {
+        String token = creds.refreshAccessToken();
+        HttpResponse resp = httpClient.get(
+            "https://gmail.googleapis.com/gmail/v1/users/me/messages?q=is:unread",
+            Map.of("Authorization", "Bearer " + token)
+        );
+        return parseGmailJson(resp.body());
+    }
+}</code></pre>
+
+    <p>Auth handling, endpoint shape, response parsing — all hand-written, all specific to Gmail. Build a second app that also needs Gmail access, and someone writes this exact class again, probably slightly differently, probably with slightly different bugs.</p>
+
+    <p>So the honest answer is: function calling and MCP aren't rivals, they solve two different halves of the same journey.</p>
+
+    <ul>
+      <li><strong>Model ↔ App</strong>: "The model wants to call <code>fetch_unread_emails</code>." → solved by function/tool calling.</li>
+      <li><strong>App ↔ External service</strong>: "Someone has to actually talk to Gmail's API." → this is what kept getting rewritten per app, and this is what MCP standardizes.</li>
+    </ul>
+
+    <div class="figure">
+      <svg width="900" height="420" viewBox="0 0 900 420" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrowBlue" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#2563a6" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+          <marker id="arrowGreen2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#1a7f5a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <rect width="900" height="420" fill="#ffffff"/>
+        <rect x="60" y="150" width="180" height="70" rx="12" fill="#eaf1fb" stroke="#2563a6" stroke-width="1.4"/>
+        <text x="150" y="180" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#1a4a7d">LLM</text>
+        <text x="150" y="200" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#3a6ea5">decides what to do</text>
+        <rect x="360" y="150" width="180" height="70" rx="12" fill="#eef1f5" stroke="#5b6b7d" stroke-width="1.4"/>
+        <text x="450" y="180" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#2c3e50">Your App</text>
+        <text x="450" y="200" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#5b6b7d">carries out the decision</text>
+        <rect x="660" y="150" width="180" height="70" rx="12" fill="#e3f4ec" stroke="#1a7f5a" stroke-width="1.4"/>
+        <text x="750" y="180" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="16" font-weight="700" fill="#0f5c40">Gmail / Broker</text>
+        <text x="750" y="200" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1a7f5a">the real service</text>
+        <path d="M240 165 L358 165" fill="none" stroke="#2563a6" stroke-width="1.6" marker-end="url(#arrowBlue)"/>
+        <path d="M358 195 L242 195" fill="none" stroke="#2563a6" stroke-width="1.6" marker-end="url(#arrowBlue)"/>
+        <rect x="145" y="80" width="210" height="46" rx="10" fill="#ffffff" stroke="#2563a6" stroke-width="1"/>
+        <text x="250" y="108" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#1a4a7d">Function / tool calling</text>
+        <line x1="250" y1="126" x2="250" y2="150" stroke="#2563a6" stroke-width="1" stroke-dasharray="3 3"/>
+        <path d="M542 175 L658 175" fill="none" stroke="#1a7f5a" stroke-width="1.6" marker-end="url(#arrowGreen2)"/>
+        <path d="M658 205 L544 205" fill="none" stroke="#1a7f5a" stroke-width="1.6" marker-end="url(#arrowGreen2)"/>
+        <rect x="495" y="240" width="210" height="46" rx="10" fill="#ffffff" stroke="#1a7f5a" stroke-width="1"/>
+        <text x="600" y="268" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" font-weight="600" fill="#0f5c40">MCP</text>
+        <line x1="600" y1="220" x2="600" y2="240" stroke="#1a7f5a" stroke-width="1" stroke-dasharray="3 3"/>
+        <text x="150" y="330" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#3a3a3a">"I want to call</text>
+        <text x="150" y="348" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#3a3a3a">fetch_unread_emails"</text>
+        <text x="750" y="330" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#3a3a3a">auth, endpoints,</text>
+        <text x="750" y="348" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#3a3a3a">pagination, JSON parsing</text>
+        <text x="450" y="380" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="600" fill="#1a1a1a">Same app code, any MCP-speaking service — no rewriting per tool</text>
+      </svg>
+      <div class="figure-caption">Function calling connects the LLM to your app. MCP connects your app to the real service. Two different layers, not competitors.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S3 ===== -->
+<section class="chapter reveal" id="s3">
+  <div class="wrap">
+    <span class="eyebrow">03 — Who talks to whom</span>
+    <h2>So who talks to whom — client, server, and the LLM</h2>
+
+    <p>Once that separation is clear, the natural next question is: does the MCP client decide which tool gets called?</p>
+
+    <p>No — and this is the one place it's easy to get backwards. <strong>The LLM decides. The MCP client just carries out that decision.</strong></p>
+
+    <p><strong>MCP Server</strong> (owned by the service — Gmail, Slack, a stock broker): exposes what tools exist and their schemas, contains the real implementation (auth, API calls, parsing), and knows nothing about the LLM or the conversation.</p>
+
+    <p><strong>MCP Client</strong> (lives inside your app — Claude, an IDE agent): asks the server "what tools do you have?", hands those schemas to the LLM, waits for the LLM to decide which tool to call and with what arguments, forwards that decision to the server, and returns the result back to the LLM.</p>
+
+    <p>A single turn of conversation, step by step:</p>
+
+    <div class="figure">
+      <svg width="900" height="560" viewBox="0 0 900 560" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <marker id="arrowSeq" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M2 1L8 5L2 9" fill="none" stroke="#3a3a3a" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </marker>
+        </defs>
+        <rect width="900" height="560" fill="#ffffff"/>
+        <rect x="60" y="30" width="180" height="50" rx="10" fill="#eaf1fb" stroke="#2563a6" stroke-width="1.4"/>
+        <text x="150" y="61" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#1a4a7d">LLM</text>
+        <rect x="360" y="30" width="180" height="50" rx="10" fill="#eef1f5" stroke="#5b6b7d" stroke-width="1.4"/>
+        <text x="450" y="61" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#2c3e50">MCP Client</text>
+        <rect x="660" y="30" width="180" height="50" rx="10" fill="#e3f4ec" stroke="#1a7f5a" stroke-width="1.4"/>
+        <text x="750" y="61" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="15" font-weight="700" fill="#0f5c40">MCP Server</text>
+        <line x1="150" y1="80" x2="150" y2="520" stroke="#c7cdd4" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <line x1="450" y1="80" x2="450" y2="520" stroke="#c7cdd4" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <line x1="750" y1="80" x2="750" y2="520" stroke="#c7cdd4" stroke-width="1.2" stroke-dasharray="4 3"/>
+        <path d="M450 120 L750 120" fill="none" stroke="#5b6b7d" stroke-width="1.4" marker-end="url(#arrowSeq)"/>
+        <text x="600" y="112" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#5b6b7d">1. "what tools do you have?"</text>
+        <path d="M750 150 L450 150" fill="none" stroke="#1a7f5a" stroke-width="1.4" marker-end="url(#arrowSeq)"/>
+        <text x="600" y="145" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1a7f5a">2. tool list + schemas</text>
+        <path d="M450 200 L150 200" fill="none" stroke="#2563a6" stroke-width="1.4" marker-end="url(#arrowSeq)"/>
+        <text x="300" y="192" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#2563a6">3. user message + tool list</text>
+        <rect x="70" y="225" width="160" height="46" rx="8" fill="#fff7e6" stroke="#c78f1e" stroke-width="1.2"/>
+        <text x="150" y="245" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#8a6110">LLM decides:</text>
+        <text x="150" y="261" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#8a6110">call fetch_unread_emails</text>
+        <path d="M150 290 L450 290" fill="none" stroke="#2563a6" stroke-width="1.4" marker-end="url(#arrowSeq)"/>
+        <text x="300" y="282" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#2563a6">4. "call this tool, these args"</text>
+        <path d="M450 335 L750 335" fill="none" stroke="#5b6b7d" stroke-width="1.4" marker-end="url(#arrowSeq)"/>
+        <text x="600" y="327" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#5b6b7d">5. execute tool call</text>
+        <rect x="670" y="360" width="160" height="46" rx="8" fill="#fbe9e7" stroke="#c0392b" stroke-width="1.2"/>
+        <text x="750" y="380" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#8e2b1f">Server runs:</text>
+        <text x="750" y="396" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#8e2b1f">auth + real API call</text>
+        <path d="M750 425 L450 425" fill="none" stroke="#1a7f5a" stroke-width="1.4" marker-end="url(#arrowSeq)"/>
+        <text x="600" y="417" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#1a7f5a">6. result data</text>
+        <path d="M450 465 L150 465" fill="none" stroke="#2563a6" stroke-width="1.4" marker-end="url(#arrowSeq)"/>
+        <text x="300" y="457" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#2563a6">7. tool result</text>
+        <rect x="60" y="480" width="180" height="40" rx="8" fill="#eaf1fb" stroke="#2563a6" stroke-width="1.2"/>
+        <text x="150" y="504" text-anchor="middle" font-family="Helvetica, Arial, sans-serif" font-size="12" font-weight="600" fill="#1a4a7d">LLM writes final answer</text>
+      </svg>
+      <div class="figure-caption">The LLM decides what to call. The MCP client carries out the decision. The MCP server does the actual work.</div>
+    </div>
+
+    <p>In code, an MCP client sitting inside a Java app looks like this:</p>
+
+    <pre class="code"><code>class McpClientApp {
+    AnthropicClient llm;         // calls to Claude's API
+    McpConnection brokerServer;  // connection to the broker's MCP server
+
+    void handleUserMessage(String userInput) {
+        List&lt;Tool&gt; tools = brokerServer.listTools(); // ask the server what it can do
+
+        LlmResponse response = llm.sendMessage(userInput, tools);
+
+        if (response.wantsToolCall()) {
+            String toolName = response.getToolName();      // e.g. "get_portfolio_holdings"
+            Map&lt;String, Object&gt; args = response.getToolArgs();
+
+            ToolResult result = brokerServer.callTool(toolName, args);
+
+            String finalAnswer = llm.sendToolResult(result);
+        }
+    }
+}</code></pre>
+
+    <p>Notice what this class does <em>not</em> contain: no broker-specific auth code, no hand-parsed JSON shapes. That's living inside the broker's MCP server instead — written once, by people who understand that API best, and reusable by every MCP-speaking app that wants portfolio data.</p>
+  </div>
+</section>
+
+<!-- ===== S4 ===== -->
+<section class="chapter reveal" id="s4">
+  <div class="wrap">
+    <span class="eyebrow">04 — The plain-language version</span>
+    <h2>The version to explain to a non-technical friend</h2>
+
+    <p>Strip away the code and protocol names, and here's the plain-language version worth keeping in your back pocket:</p>
+
+    <p>Think of an AI assistant as a smart new employee. Brilliant at thinking and talking, but to actually get things done — check email, look up a bank balance — they need access to <em>other people's</em> systems.</p>
+
+    <p>Before MCP, every company hiring an AI employee had to individually train them on every system: "here's how you log into Gmail," "here's the secret handshake for the bank." Ten companies, ten AI employees, all learning the same handshakes independently — a lot of duplicated effort, and more room for mistakes.</p>
+
+    <p>MCP is every service publishing an official instruction manual once, in a common language, so any AI employee can read it and know how to work with that system from day one.</p>
+
+    <div class="callout">
+      <p>One nuance worth keeping even in this simple version: the AI still does the <em>thinking</em> — deciding <em>when</em> to check the inbox. MCP doesn't replace that judgment. It just guarantees that once the decision is made, there's a standard, reliable way to carry it out.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ===== S5 ===== -->
+<section class="chapter reveal" id="s5">
+  <div class="wrap">
+    <span class="eyebrow">05 — Wrap-up</span>
+    <h2>The takeaway</h2>
+
+    <p>MCP isn't a replacement for function calling — it's the missing other half. Function calling standardized how a model <em>expresses</em> intent. MCP standardizes how that intent gets <em>executed</em> against the real world, so that the same integration — Gmail, Slack, a stock broker's API — doesn't need to be rebuilt from scratch inside every AI app that wants to use it.</p>
+
+    <div class="tags">
+      <span class="tag-pill">MCP</span>
+      <span class="tag-pill">function-calling</span>
+      <span class="tag-pill">Java</span>
+      <span class="tag-pill">LLM tools</span>
+      <span class="tag-pill">AI architecture</span>
+      <span class="tag-pill">students</span>
+    </div>
+  </div>
+</section>
+
+<!-- ===== engagement: comments (id must NOT start with 's') ===== -->
+<div id="emailModalBg" class="modalbg" hidden>
+  <div class="modalbox">
+    <h4>One quick thing</h4>
+    <p class="note">Add your name and email so we know who's liking and commenting. We won't spam you, and this browser won't ask again.</p>
+    <input type="text" id="mName" placeholder="Name">
+    <input type="email" id="mEmail" placeholder="you@example.com">
+    <div class="btnrow" style="margin-top:14px">
+      <button class="btn orange" id="mContinue">Continue</button>
+      <button class="btn ghost" id="mCancel">Cancel</button>
+    </div>
+    <div class="note" id="mErr" style="color:var(--tool); margin-top:8px"></div>
+  </div>
+</div>
+
+<section id="comments" class="chapter reveal">
+  <div class="wrap">
+    <span class="eyebrow">Join the discussion</span>
+    <h2>Comments</h2>
+    <p class="note" id="commentsConfigNote" hidden>Comments and likes aren't connected to a backend yet — search this file for "SUPABASE_URL" for setup steps. They'll still work on this screen, but won't be saved or shown to other visitors until that's done.</p>
+    <div class="panel">
+      <span class="tag">Leave a comment on the article</span>
+      <textarea id="cBody" class="ctextarea" rows="3" placeholder="Ask a question, share what clicked for you…"></textarea>
+      <div class="btnrow"><button class="btn orange" id="cSubmit">Post comment</button></div>
+      <div class="note" id="cStatus" style="margin-top:6px"></div>
+      <div class="clist" id="cList"></div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p><b>MCP Explained the Way You'd Actually Ask About It.</b> A from-first-principles Groundwork write-up on Model Context Protocol — the N×M problem, why it isn't function calling, and the client/server/LLM split.</p>
+  </div>
+</footer>
+</main>
+
+<!-- ===== floating widgets ===== -->
+<div id="narrator">
+  <div class="narr-panel" id="narrPanel" hidden>
+    <h4>Voice narration</h4>
+    <div class="narr-row"><span>Narrate as I scroll</span><button id="narrOnOff" class="btn ghost small">Turn on</button></div>
+    <div class="narr-row"><select id="narrVoice" aria-label="Choose a voice"></select></div>
+    <div class="narr-btnrow"><button id="narrReplay" class="btn ghost small">Replay section</button><button id="narrPauseBtn" class="btn ghost small" disabled>Pause</button></div>
+    <div class="narr-status" id="narrStatus">Off — press "Turn on" to begin.</div>
+  </div>
+  <button id="narrFab" class="narr-fab" aria-label="Open voice narration controls" aria-expanded="false" title="Voice narration">🔊</button>
+</div>
+<div id="aitools">
+  <button id="aiCopyFab" class="ai-fab" type="button">📋 Copy this article for your AI</button>
+</div>
+
+<!-- ===== CDN libs ===== -->
+<script src="../assets/config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer onload="window.__sbReady && window.__sbReady()"></script>
+
+<!-- ===== main script (helpers + scroll rail + reveal) ===== -->
+<script>
+var CONFIG = Object.assign({}, window.CONFIG_SHARED || {SUPABASE_URL:'YOUR_SUPABASE_URL', SUPABASE_ANON_KEY:'YOUR_SUPABASE_ANON_KEY'}, {
+  ARTICLE_ID: 'mcp-explained'
+});
+function el(id){ return document.getElementById(id); }
+function on(id,ev,fn){ var e=el(id); if(e) e.addEventListener(ev,fn); }
+
+(function(){
+  var links=document.querySelectorAll('#rail a'), secs=[];
+  for(var i=0;i<links.length;i++){ var t=el(links[i].getAttribute('data-sec')); if(t) secs.push({elm:t, link:links[i]}); }
+  function onScroll(){
+    var d=document.documentElement, sc=d.scrollTop||document.body.scrollTop, mid=sc+window.innerHeight*0.35, active=secs.length?secs[0]:null;
+    for(var i=0;i<secs.length;i++){ if(secs[i].elm.offsetTop<=mid) active=secs[i]; }
+    for(var j=0;j<secs.length;j++) secs[j].link.classList.toggle('active', active&&secs[j]===active);
+  }
+  window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in'); io.unobserve(e.target); } }); },{rootMargin:'0px 0px -12% 0px'});
+    var revs=document.querySelectorAll('.reveal'); for(var k=0;k<revs.length;k++) io.observe(revs[k]);
+  } else { var r2=document.querySelectorAll('.reveal'); for(var m=0;m<r2.length;m++) r2[m].classList.add('in'); }
+})();
+</script>
+
+<!-- ===== engagement module JS ===== -->
+<script>
+(function(){
+  var CONFIGURED=!!(CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY && CONFIG.SUPABASE_URL.indexOf('supabase.co')!==-1 && CONFIG.SUPABASE_ANON_KEY.indexOf('YOUR_')!==0);
+  var sb=null;
+  function initClient(){ if(!CONFIGURED||!window.supabase||sb)return; sb=window.supabase.createClient(CONFIG.SUPABASE_URL,CONFIG.SUPABASE_ANON_KEY); loadLikeCounts(); loadComments(); }
+  window.__sbReady=initClient;
+  var LS_EMAIL='groundwork_email', LS_NAME='groundwork_name';
+  function getIdentity(){ try{ var e=localStorage.getItem(LS_EMAIL); return e?{email:e,name:localStorage.getItem(LS_NAME)||''}:null; }catch(err){ return null; } }
+  function saveIdentity(email,name){ try{ localStorage.setItem(LS_EMAIL,email); localStorage.setItem(LS_NAME,name||''); }catch(err){} }
+  var pendingAction=null;
+  function openModal(action){ pendingAction=action; el('mErr').textContent=''; el('emailModalBg').removeAttribute('hidden'); el('mEmail').focus(); }
+  function closeModal(){ el('emailModalBg').setAttribute('hidden',''); pendingAction=null; }
+  on('mCancel','click',closeModal);
+  on('mContinue','click',function(){
+    var email=el('mEmail').value.trim(), name=el('mName').value.trim();
+    if(!name){ el('mErr').textContent='Please enter your name.'; return; }
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ el('mErr').textContent='Please enter a valid email address.'; return; }
+    saveIdentity(email,name);
+    if(CONFIGURED&&sb){ sb.from('subscribers').insert({email:email, article_id:CONFIG.ARTICLE_ID}).then(function(){}); }
+    var act=pendingAction; closeModal(); if(act) act({email:email,name:name});
+  });
+  function requireIdentity(action){ var id=getIdentity(); if(id) action(id); else openModal(action); }
+  function renderLikeButtons(){
+    var secs=document.querySelectorAll('section.chapter[id^="s"]');
+    for(var i=0;i<secs.length;i++){ var sec=secs[i], h2=sec.querySelector('h2'); if(!h2)continue;
+      var btn=document.createElement('button'); btn.type='button'; btn.className='likebtn'; btn.setAttribute('data-sec',sec.id);
+      btn.innerHTML='<span class="hrt">🤍</span><span class="cnt">0</span> like this section';
+      h2.insertAdjacentElement('afterend',btn);
+      (function(btn,secId){ btn.addEventListener('click',function(){ if(btn.classList.contains('liked'))return; requireIdentity(function(id){ doLike(secId,btn,id); }); }); })(btn,sec.id);
+    }
+  }
+  function doLike(sectionId,btn,id){
+    btn.classList.add('liked'); btn.querySelector('.hrt').textContent='❤';
+    var cnt=btn.querySelector('.cnt'); cnt.textContent=(parseInt(cnt.textContent,10)||0)+1;
+    try{ localStorage.setItem('groundwork_liked_'+CONFIG.ARTICLE_ID+'_'+sectionId,'1'); }catch(e){}
+    if(CONFIGURED&&sb){ sb.from('likes').insert({article_id:CONFIG.ARTICLE_ID, section_id:sectionId, email:id.email}).then(function(res){ if(res&&res.error&&!/duplicate/i.test(res.error.message||'')) console.warn('like failed',res.error); }); }
+  }
+  function restoreLikedState(){ var btns=document.querySelectorAll('.likebtn'); for(var i=0;i<btns.length;i++){ var sid=btns[i].getAttribute('data-sec'); try{ if(localStorage.getItem('groundwork_liked_'+CONFIG.ARTICLE_ID+'_'+sid)==='1'){ btns[i].classList.add('liked'); btns[i].querySelector('.hrt').textContent='❤'; } }catch(e){} } }
+  function loadLikeCounts(){ if(!(CONFIGURED&&sb))return; sb.from('likes').select('section_id').eq('article_id',CONFIG.ARTICLE_ID).then(function(res){ if(!res||res.error||!res.data)return; var counts={}; for(var i=0;i<res.data.length;i++){ var s=res.data[i].section_id; counts[s]=(counts[s]||0)+1; } var btns=document.querySelectorAll('.likebtn'); for(var j=0;j<btns.length;j++){ var sid=btns[j].getAttribute('data-sec'); btns[j].querySelector('.cnt').textContent=counts[sid]||0; } }); }
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function renderComment(c){ var div=document.createElement('div'); div.className='ccard'; var name=(c.name&&c.name.length)?escapeHtml(c.name):'Anonymous'; div.innerHTML='<div class="cname">'+name+'</div><div class="cbody">'+escapeHtml(c.body)+'</div>'; return div; }
+  function loadComments(){ if(!(CONFIGURED&&sb))return; sb.from('comments').select('name,body,created_at').eq('article_id',CONFIG.ARTICLE_ID).eq('section_id','general').eq('approved',true).order('created_at',{ascending:false}).then(function(res){ if(!res||res.error||!res.data)return; var list=el('cList'); list.innerHTML=''; for(var i=0;i<res.data.length;i++) list.appendChild(renderComment(res.data[i])); }); }
+  on('cSubmit','click',function(){
+    var body=el('cBody').value.trim(); if(!body){ el('cStatus').textContent='Write something first.'; return; }
+    requireIdentity(function(id){
+      el('cStatus').textContent='Posting…'; var localC={name:id.name,body:body};
+      if(CONFIGURED&&sb){ sb.from('comments').insert({article_id:CONFIG.ARTICLE_ID, section_id:'general', email:id.email, name:id.name, body:body}).then(function(res){ if(res&&res.error){ el('cStatus').textContent='Could not post — please try again.'; return; } el('cList').insertBefore(renderComment(localC),el('cList').firstChild); el('cBody').value=''; el('cStatus').textContent='Posted — it\'ll appear for other visitors after a quick review.'; }); }
+      else { el('cList').insertBefore(renderComment(localC),el('cList').firstChild); el('cBody').value=''; el('cStatus').textContent='Posted on this screen only — backend not configured yet, see setup notes above.'; }
+    });
+  });
+  if(!CONFIGURED){ var note=el('commentsConfigNote'); if(note) note.removeAttribute('hidden'); }
+  renderLikeButtons(); restoreLikedState();
+  if(CONFIGURED&&window.supabase) initClient();
+})();
+</script>
+
+<!-- ===== narrator module JS ===== -->
+<script>
+(function(){
+  var fab=document.getElementById('narrFab'), panel=document.getElementById('narrPanel'); if(!fab) return;
+  function el(id){ return document.getElementById(id); }
+  function on(id,ev,fn){ var e=el(id); if(e) e.addEventListener(ev,fn); }
+  var supported=('speechSynthesis' in window);
+  var TITLES={ top:'Introduction', s1:'What problem are we solving?', s2:"Isn't this function calling?", s3:'Client, server & the LLM', s4:'Explain it to a friend', s5:'The takeaway' };
+  var SCRIPTS={
+    top:"Welcome. You've probably heard MCP — Model Context Protocol — thrown around lately. Instead of jumping into protocol specs, we'll walk it the way a curious developer actually asks about it: one honest question at a time, until the picture clicks.",
+    s1:"Start with the problem. A language model is brilliant at reasoning, but it can't reach outside itself — to answer 'how diversified is my portfolio' it has to fetch real data through some code. Now picture several apps and several services: every app hand-writes its own integration to every tool. That's the N-times-M problem. MCP puts one shared protocol in the middle, so a tool is wired up once and any app can use it.",
+    s2:"The question that trips everyone up: isn't this just function calling? Not quite. Function calling solves one thing — how the model tells your app what it wants to do, as a structured request. But it says nothing about who writes the code that actually talks to Gmail or a broker. That part kept getting rewritten in every app. MCP standardizes exactly that half.",
+    s3:"So who's in charge? The LLM decides which tool to call — the MCP client just carries out the decision. The server, owned by the service, holds the real implementation and the tool schemas. The client, inside your app, asks the server what tools exist, hands them to the model, and forwards whatever the model chooses. Follow the seven steps in the diagram and it's a clean loop.",
+    s4:"Here's the version for a non-technical friend. An AI assistant is a smart new employee — great at thinking, but it needs access to other people's systems to get anything done. Before MCP, every company trained its AI on every system from scratch. MCP is each service publishing one official instruction manual, in a common language, so any AI can pick it up on day one. The AI still decides when to act — MCP just makes carrying it out reliable.",
+    s5:"The takeaway: MCP isn't a rival to function calling, it's the missing other half. Function calling standardized how a model expresses intent; MCP standardizes how that intent gets executed against the real world — so the same integration doesn't get rebuilt inside every app that wants it."
+  };
+  var narrationOn=false, currentId=null, lastVisible='top';
+  function setSpeakingUI(id,speaking){ fab.classList.toggle('speaking',!!speaking); var links=document.querySelectorAll('#rail a'); for(var i=0;i<links.length;i++) links[i].classList.toggle('speaking', speaking && links[i].getAttribute('data-sec')===id); }
+  function statusIdle(){ el('narrStatus').textContent = narrationOn?'On — narrating as you scroll.':'Off — press "Turn on" to begin.'; }
+  function statusSpeaking(id){ el('narrStatus').innerHTML='Speaking — <b>'+(TITLES[id]||id)+'</b>'; }
+  function getSelectedVoice(){ if(!supported)return null; var val=el('narrVoice').value, voices=window.speechSynthesis.getVoices(); for(var i=0;i<voices.length;i++){ if(voices[i].name+'|'+voices[i].lang===val) return voices[i]; } return voices[0]||null; }
+  function populateVoices(){ if(!supported)return; var voices=window.speechSynthesis.getVoices(); if(!voices.length)return; var sel=el('narrVoice'); if(sel.options.length)return; var en=voices.filter(function(v){return /^en/i.test(v.lang);}); var rest=voices.filter(function(v){return !/^en/i.test(v.lang);}); (en.length?en.concat(rest):voices).forEach(function(v){ var o=document.createElement('option'); o.value=v.name+'|'+v.lang; o.textContent=v.name+' ('+v.lang+')'; sel.appendChild(o); }); }
+  if(supported){ populateVoices(); window.speechSynthesis.onvoiceschanged=populateVoices; }
+  function speak(id){ if(!supported)return; var text=SCRIPTS[id]; if(!text)return; window.speechSynthesis.cancel(); var u=new SpeechSynthesisUtterance(text); var v=getSelectedVoice(); if(v)u.voice=v; u.rate=0.98; u.pitch=1; u.onstart=function(){ setSpeakingUI(id,true); statusSpeaking(id); el('narrPauseBtn').disabled=false; el('narrPauseBtn').textContent='Pause'; }; u.onend=function(){ setSpeakingUI(id,false); statusIdle(); }; u.onerror=function(){ setSpeakingUI(id,false); statusIdle(); }; window.speechSynthesis.speak(u); currentId=id; }
+  function turnOn(){ narrationOn=true; el('narrOnOff').textContent='Turn off'; fab.classList.add('active'); statusIdle(); if(lastVisible) speak(lastVisible); }
+  function turnOff(){ narrationOn=false; if(supported) window.speechSynthesis.cancel(); el('narrOnOff').textContent='Turn on'; fab.classList.remove('active'); setSpeakingUI(null,false); el('narrPauseBtn').disabled=true; el('narrPauseBtn').textContent='Pause'; currentId=null; statusIdle(); }
+  if(!supported){ statusIdle(); el('narrStatus').textContent="Voice narration isn't supported in this browser."; el('narrOnOff').disabled=true; el('narrReplay').disabled=true; el('narrPauseBtn').disabled=true; el('narrVoice').disabled=true; } else { statusIdle(); }
+  on('narrFab','click',function(){ var hidden=panel.hasAttribute('hidden'); if(hidden){ panel.removeAttribute('hidden'); fab.setAttribute('aria-expanded','true'); } else { panel.setAttribute('hidden',''); fab.setAttribute('aria-expanded','false'); } });
+  on('narrOnOff','click',function(){ narrationOn?turnOff():turnOn(); });
+  on('narrReplay','click',function(){ var id=currentId||lastVisible; if(id) speak(id); });
+  on('narrPauseBtn','click',function(){ if(!supported||!window.speechSynthesis.speaking)return; if(window.speechSynthesis.paused){ window.speechSynthesis.resume(); el('narrPauseBtn').textContent='Pause'; } else { window.speechSynthesis.pause(); el('narrPauseBtn').textContent='Resume'; } });
+  var secs=document.querySelectorAll('section.chapter, .hero');
+  if('IntersectionObserver' in window){ var nio=new IntersectionObserver(function(es){ es.forEach(function(e){ if(e.isIntersecting){ lastVisible=e.target.id; if(narrationOn && lastVisible!==currentId) speak(lastVisible); } }); },{rootMargin:'-25% 0px -55% 0px'}); for(var i=0;i<secs.length;i++) nio.observe(secs[i]); }
+})();
+</script>
+
+<!-- ===== ai-tools module JS ===== -->
+<script>
+(function(){
+  var fab=el('aiCopyFab'); if(!fab) return;
+  var ARTICLE_TITLE="MCP Explained the Way You'd Actually Ask About It";
+  var ARTICLE_SUMMARY="A student-friendly, from-first-principles explanation of Model Context Protocol (MCP): the N×M integration problem it solves, why it is complementary to (not a replacement for) LLM function/tool calling, the roles of the MCP client, MCP server, and the LLM in a single tool-call turn, a plain-language analogy, and the overall takeaway.";
+  var ARTICLE_MARKDOWN="# MCP Explained the Way You'd Actually Ask About It\n\nA from-first-principles walk through Model Context Protocol, following the questions a developer would actually ask, in order.\n\n## 1. What problem are we solving?\nAn LLM is great at reasoning but can't reach outside itself — to answer a question about real data (e.g. a portfolio), some code must fetch it from a service's API. With several apps and several services, every app hand-writes its own integration to every tool: N apps × M tools = the **N×M problem**. MCP puts one shared protocol in the middle: each tool exposes itself through MCP once, and any MCP-speaking app can use it without tool-specific code.\n\n## 2. Isn't this just function calling?\nNo — they solve two different halves. **Function/tool calling** (OpenAI 'function calling' = Anthropic 'tool use') solves *Model ↔ App*: the model returns a structured request (a JSON-schema function call) instead of plain text. But it says nothing about *who writes the code that executes the call*. That *App ↔ External service* half — auth, endpoints, parsing, all hand-written per app — is exactly what **MCP** standardizes.\n\n## 3. Who talks to whom — client, server, and the LLM?\nThe **LLM decides** which tool to call; the **MCP client** just carries out the decision. The **MCP Server** (owned by the service) exposes tool schemas and holds the real implementation (auth, API calls, parsing) and knows nothing about the LLM. The **MCP Client** (inside your app) asks the server what tools exist, hands the schemas to the LLM, forwards the LLM's chosen tool call to the server, and returns the result to the LLM. One turn: client asks server for tools → server returns schemas → client gives user message + tools to LLM → LLM picks a tool → client tells server to run it → server does auth + real API call → result back to client → back to LLM → LLM writes the final answer. The client app contains no service-specific auth or JSON parsing — that lives in the service's MCP server, written once.\n\n## 4. The plain-language version\nAn AI assistant is like a smart new employee: brilliant at thinking, but it needs access to other people's systems to get things done. Before MCP, every company trained its AI on every system from scratch (duplicated effort, more mistakes). MCP is every service publishing one official instruction manual, in a common language, so any AI can work with it from day one. The AI still does the *thinking* — deciding *when* to act — MCP just makes carrying out the decision standard and reliable.\n\n## 5. The takeaway\nMCP isn't a replacement for function calling — it's the missing other half. Function calling standardized how a model *expresses* intent; MCP standardizes how that intent gets *executed* against the real world, so the same integration (Gmail, Slack, a broker's API) isn't rebuilt inside every AI app that wants it.";
+  var SECTION_SUMMARIES={
+    s1:"Why an LLM needs external code to act, and the N×M problem of every app hand-writing an integration to every tool — which MCP collapses by putting one shared protocol in the middle.",
+    s2:"Why MCP is not the same as function/tool calling: function calling solves Model↔App (a structured request), while MCP standardizes the App↔External-service half (auth, endpoints, parsing) that was rewritten per app.",
+    s3:"The roles in a tool call: the LLM decides, the MCP client carries out the decision, and the MCP server (owned by the service) holds the real implementation and schemas — walked through as a seven-step single turn.",
+    s4:"A plain-language analogy: an AI as a smart new employee needing access to others' systems; MCP as each service publishing one shared instruction manual so any AI can use it from day one.",
+    s5:"The takeaway that MCP complements function calling — function calling standardizes expressing intent, MCP standardizes executing it — so integrations aren't rebuilt inside every app."
+  };
+  var PROMPTS={
+    s1:["What is the N×M problem in AI tool integrations, and how does MCP reduce it?","Why can't an LLM just fetch external data on its own without an integration layer?"],
+    s2:["What's the difference between LLM function calling and MCP — and why aren't they competitors?","Which part of a tool call does function calling handle vs which part does MCP handle?"],
+    s3:["In MCP, who decides which tool to call — the client, the server, or the LLM?","Walk me through the steps of a single MCP tool-call turn between client, server, and LLM."],
+    s4:["Explain MCP with a simple non-technical analogy.","In the 'AI employee' analogy, what does MCP replace and what does it not replace?"],
+    s5:["Summarize how MCP and function calling fit together in one sentence.","Why does MCP mean an integration like Gmail doesn't need rebuilding in every AI app?"]
+  };
+  function copyText(text,btn,doneLabel,restoreLabel){
+    function ok(){ var orig=restoreLabel!==undefined?restoreLabel:btn.innerHTML; btn.innerHTML=doneLabel; if(btn.classList)btn.classList.add('done'); setTimeout(function(){ btn.innerHTML=orig; if(btn.classList)btn.classList.remove('done'); },1800); }
+    function fallback(){ try{ var ta=document.createElement('textarea'); ta.value=text; ta.setAttribute('readonly',''); ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select(); var s=document.execCommand&&document.execCommand('copy'); document.body.removeChild(ta); if(s)ok(); else btn.innerHTML='Copy failed — select & copy manually'; }catch(e){ btn.innerHTML='Copy failed — select & copy manually'; } }
+    if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(text).then(ok,fallback); } else { fallback(); }
+  }
+  on('aiCopyFab','click',function(){ copyText(ARTICLE_MARKDOWN, fab, '✓ Copied — paste into your AI', '📋 Copy this article for your AI'); });
+  function buildPrompt(sectionId,question){ var ss=SECTION_SUMMARIES[sectionId]||''; return "Context: I'm reading an interactive article called \""+ARTICLE_TITLE+"\" which covers: "+ARTICLE_SUMMARY+"\n\nThis question is about one section of it"+(ss?(": "+ss):".")+"\n\nMy question: "+question; }
+  function renderAskAI(){
+    var secs=document.querySelectorAll('section.chapter[id^="s"]');
+    for(var i=0;i<secs.length;i++){ var sec=secs[i], prompts=PROMPTS[sec.id]; if(!prompts)continue;
+      var box=document.createElement('div'); box.className='askai';
+      box.innerHTML='<span class="tag">🤖 Ask your AI about this section</span><div class="askrow"></div>';
+      var row=box.querySelector('.askrow');
+      prompts.forEach(function(q){ var chip=document.createElement('button'); chip.type='button'; chip.className='askchip'; chip.innerHTML='<span class="ico">📋</span><span class="txt"></span>'; chip.querySelector('.txt').textContent='“'+q+'”'; (function(sid,qt,ce){ ce.addEventListener('click',function(){ copyText(buildPrompt(sid,qt),ce,'✓ Copied with context'); }); })(sec.id,q,chip); row.appendChild(chip); });
+      var wrap=sec.querySelector('.wrap')||sec; wrap.appendChild(box);
+    }
+  }
+  renderAskAI();
+})();
+</script>
+
+</body>
+</html>
